@@ -1,0 +1,13 @@
+---
+description: Phone UI must never scroll horizontally
+alwaysApply: true
+---
+
+# No horizontal scroll
+
+The IRIS phone frame is 390px. Never introduce horizontal scrolling on any screen.
+
+- Do not use `overflow-x: auto` or single-row chip/tab bars that overflow.
+- Tabs, filters, and action rows must fit the width: wrap, equal grid columns, or smaller type.
+- Prefer `minmax(0, 1fr)`, `min-width: 0`, and wrapping text over `flex-shrink: 0` + `nowrap`.
+- Keep `.app-scroll` as `overflow-x: hidden`.
