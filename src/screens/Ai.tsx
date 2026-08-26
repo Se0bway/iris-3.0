@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { customers, homeGroups } from "../data";
+import { customers, homeGroups, pushNotices } from "../data";
 import { draftMessage, messageTypeLabel } from "../lib";
 import { useNav } from "../nav";
 import type { MessageType } from "../types";
@@ -171,7 +171,7 @@ export function BoardScreen() {
   const nav = useNav();
   return (
     <div className="app-scroll">
-      <TopBar title="본사발신 게시판" onBack={nav.back} />
+      <TopBar title="게시판" onBack={nav.back} />
       <div className="banner">
         <b>8월 자음생 집중 운영</b>
         <p>재구매 도래 고객 우선 관리 · 8/31까지</p>
@@ -192,6 +192,35 @@ export function BoardScreen() {
                 </p>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function PushScreen() {
+  const nav = useNav();
+  return (
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title="Push 알림" onBack={nav.back} />
+      <div className="pad">
+        <div className="card list-card">
+          {pushNotices.map((n) => (
+            <button
+              key={n.id}
+              className={`push-row ${n.unread ? "unread" : ""}`}
+              type="button"
+              onClick={() => nav.setToast(n.body)}
+            >
+              <i className={n.unread ? "on" : ""} />
+              <div className="meta">
+                <span className="push-tag">{n.tag}</span>
+                <b>{n.title}</b>
+                <p>{n.body}</p>
+                <em>{n.time}</em>
+              </div>
+            </button>
           ))}
         </div>
       </div>

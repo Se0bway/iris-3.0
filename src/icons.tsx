@@ -168,6 +168,11 @@ export const IconPill = (p: P) => (
     <path d="M9 9.5l6 6" />
   </I>
 );
+export const IconCrown = (p: P) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden {...p}>
+    <path d="M4.2 16.2 2.8 8.4l5.1 3.1L12 5.2l4.1 6.3 5.1-3.1-1.4 7.8H4.2Zm-.2 2.3h16v2.1H4v-2.1Z" />
+  </svg>
+);
 export const IconStar = (p: P) => (
   <I {...p}>
     <path d="M12 4l2.1 4.4 4.9.6-3.6 3.3.9 4.8L12 15.2 7.7 17.1l.9-4.8L5 9l4.9-.6z" />

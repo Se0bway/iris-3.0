@@ -8,10 +8,12 @@ export type ScreenId =
   | "chat"
   | "links"
   | "board"
+  | "push"
   | "work"
   | "promo"
   | "order"
   | "trade"
+  | "slips"
   | "sales"
   | "collection"
   | "status"
@@ -31,6 +33,7 @@ export type ScreenId =
   | "live"
   | "education"
   | "skindiag"
+  | "guestskin"
   | "note";
 
 export type Segment =
@@ -155,6 +158,8 @@ export interface Member {
   rank: string;
   sales: number;
   education: string;
+  rotationDays: number;
+  incentive: boolean;
 }
 
 export interface NavItem {

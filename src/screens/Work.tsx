@@ -1,47 +1,13 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { counselor, customers, products, promos } from "../data";
 import { krw } from "../lib";
 import { useNav } from "../nav";
-import { IconBox, IconChevron, IconWon } from "../icons";
-import { AppHeader, TopBar } from "../ui";
+import { IconBox, IconChevron, IconSearch } from "../icons";
+import { AppHeader, Photo, TopBar } from "../ui";
 
 const stockQty = products.reduce((s, p) => s + p.stock, 0);
 const stockAmt = products.reduce((s, p) => s + p.stock * p.price, 0);
-
-function Hub({
-  title,
-  note,
-  items,
-}: {
-  title: string;
-  note: string;
-  items: { id: "promo" | "order" | "stock" | "sales" | "collection"; title: string; desc: string; icon: ReactNode }[];
-}) {
-  const nav = useNav();
-  return (
-    <div className="app-scroll">
-      <AppHeader />
-      <div className="home-title">
-        <h3>{title}</h3>
-      </div>
-      <div className="notice">{note}</div>
-      <div className="pad">
-        <div className="card list-card">
-          {items.map((it) => (
-            <button key={it.id} className="row" type="button" onClick={() => nav.go(it.id)}>
-              <div className="avatar">{it.icon}</div>
-              <div className="meta">
-                <b>{it.title}</b>
-                <p>{it.desc}</p>
-              </div>
-              <IconChevron />
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+const productBrands = ["전체", ...[...new Set(products.map((p) => p.brand))]];
 
 export function WorkScreen() {
   const nav = useNav();
@@ -103,15 +69,306 @@ export function WorkScreen() {
 }
 
 export function TradeScreen() {
+  const nav = useNav();
   return (
-    <Hub
-      title="판매 / 수금"
-      note="뉴커머스는 판매와 수금이 분리됩니다. 고객에게 판매한 뒤, 입금·미수를 따로 관리합니다."
-      items={[
-        { id: "sales", title: "판매 등록", desc: "고객 선택 → 제품 선택", icon: <IconWon /> },
-        { id: "collection", title: "수금 등록", desc: "미수 확인 후 입금 매칭", icon: <IconWon /> },
-      ]}
-    />
+    <div className="app-scroll">
+      <AppHeader />
+      <div className="home-title">
+        <h3>판매 / 수금</h3>
+      </div>
+      <div className="pad">
+        <div className="card list-card">
+          {[
+            { id: "slips" as const, n: "1", title: "전표조회", desc: "고객별 판매 · 수금 전표" },
+            { id: "sales" as const, n: "2", title: "판매", desc: "본인 재고에서 상품 판매" },
+            { id: "collection" as const, n: "3", title: "수금", desc: "현금 · 카드 수금 등록" },
+          ].map((it) => (
+            <button key={it.id} className="row" type="button" onClick={() => nav.go(it.id)}>
+              <div className="avatar">{it.n}</div>
+              <div className="meta">
+                <b>{it.title}</b>
+                <p>{it.desc}</p>
+              </div>
+              <IconChevron />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SlipsScreen() {
+  return <TradeFlow kind="slips" title="전표조회" />;
+}
+
+export function SalesScreen() {
+  return <TradeFlow kind="sales" title="판매" />;
+}
+
+export function CollectionScreen() {
+  return <TradeFlow kind="collection" title="수금" />;
+}
+
+function TradeFlow({ kind, title }: { kind: "slips" | "sales" | "collection"; title: string }) {
+  const nav = useNav();
+  const fromCrm = nav.stack[nav.stack.length - 1] === "customer";
+  const [pickedId, setPickedId] = useState<string | null>(() => (fromCrm ? nav.customerId : null));
+
+  if (!pickedId) {
+    return <CustomerPick title={title} onPick={setPickedId} onBack={nav.back} />;
+  }
+
+  const onBack = fromCrm ? nav.back : () => setPickedId(null);
+  if (kind === "slips") return <SlipsPage customerId={pickedId} onBack={onBack} />;
+  if (kind === "sales") return <SalesPage customerId={pickedId} onBack={onBack} />;
+  return <CollectPage customerId={pickedId} onBack={onBack} />;
+}
+
+function CustomerPick({
+  title,
+  onPick,
+  onBack,
+}: {
+  title: string;
+  onPick: (id: string) => void;
+  onBack: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const list = useMemo(() => {
+    const key = q.replace(/-/g, "");
+    return customers.filter(
+      (c) => !q || c.name.includes(q) || c.phone.replace(/-/g, "").includes(key)
+    );
+  }, [q]);
+
+  return (
+    <div className="app-scroll">
+      <TopBar title={title} onBack={onBack} />
+      <div className="search">
+        <IconSearch />
+        <input placeholder="고객명, 연락처" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="pad">
+        <div className="card list-card">
+          {list.length === 0 ? (
+            <p className="empty">검색 결과가 없습니다.</p>
+          ) : (
+            list.map((c) => (
+              <button key={c.id} className="person" type="button" onClick={() => onPick(c.id)}>
+                <Photo id={c.id} name={c.name} size={46} gender={c.gender} />
+                <span className="who">
+                  <span className="name-row">
+                    <b>{c.name}</b>
+                  </span>
+                  <p className="sub">
+                    {c.phone} · 미수 {c.unpaid ? krw(c.unpaid) : "없음"}
+                  </p>
+                </span>
+                <IconChevron />
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UnpaidBar({ customerId }: { customerId: string }) {
+  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  return (
+    <div className="tr-unpaid">
+      <div>
+        <span>미수금액</span>
+        <b>{c.unpaid ? krw(c.unpaid) : "없음"}</b>
+      </div>
+    </div>
+  );
+}
+
+function SlipsPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  return (
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title={c.name} onBack={onBack} />
+      <UnpaidBar customerId={c.id} />
+      <div className="tr-card">
+        <h4>전표</h4>
+        {c.ledger.length === 0 ? (
+          <p className="tr-hint">최근 전표가 없습니다.</p>
+        ) : (
+          c.ledger.map((r) => (
+            <div className="tr-prod" key={r.id}>
+              <div>
+                <b>{r.type === "sale" ? "판매" : "수금"}{r.product ? ` · ${r.product}` : ""}</b>
+                <span>
+                  {r.date} · {r.status}
+                </span>
+              </div>
+              <em className="tr-amt">{krw(r.amount)}</em>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SalesPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const nav = useNav();
+  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  const [qty, setQty] = useState<Record<string, number>>({});
+  const [brand, setBrand] = useState("전체");
+  const list = brand === "전체" ? products : products.filter((p) => p.brand === brand);
+  const saleTotal = products.reduce((s, p) => s + p.price * (qty[p.id] ?? 0), 0);
+
+  return (
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title={c.name} onBack={onBack} />
+      <UnpaidBar customerId={c.id} />
+      <div className="tr-card">
+        <h4>판매</h4>
+        <p className="tr-hint">본인 재고에서 상품을 골라 판매합니다.</p>
+        <label className="tr-brand-field">
+          <span>브랜드</span>
+          <select value={brand} onChange={(e) => setBrand(e.target.value)}>
+            {productBrands.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </label>
+        {list.length === 0 ? (
+          <p className="tr-hint">해당 브랜드 재고가 없습니다.</p>
+        ) : (
+          list.map((p) => {
+            const n = qty[p.id] ?? 0;
+            return (
+              <div className="tr-prod" key={p.id}>
+                <div>
+                  <b>
+                    {p.brand} {p.name}
+                  </b>
+                  <span>
+                    {krw(p.price)} · 재고 {p.stock}
+                  </span>
+                </div>
+                <div className="qty">
+                  <button
+                    type="button"
+                    disabled={n <= 0}
+                    onClick={() => setQty({ ...qty, [p.id]: Math.max(0, n - 1) })}
+                  >
+                    −
+                  </button>
+                  <em>{n}</em>
+                  <button
+                    type="button"
+                    disabled={n >= p.stock}
+                    onClick={() => setQty({ ...qty, [p.id]: n + 1 })}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div className="tr-sum">
+          <span>판매합계</span>
+          <b>{krw(saleTotal)}</b>
+        </div>
+        <button
+          className="btn primary"
+          type="button"
+          disabled={saleTotal <= 0}
+          onClick={() => nav.setToast("판매가 등록되었습니다. 이어서 수금을 등록하세요.")}
+        >
+          판매 등록
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CollectPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const nav = useNav();
+  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  const [cash, setCash] = useState("");
+  const [card, setCard] = useState("");
+  const [payKind, setPayKind] = useState<"approve" | "slip">("approve");
+  const cashN = Number(cash.replace(/\D/g, "")) || 0;
+  const cardN = Number(card.replace(/\D/g, "")) || 0;
+  const collectTotal = cashN + cardN;
+  const unpaidAfter = Math.max(0, c.unpaid - collectTotal);
+
+  const setAmt = (raw: string, fn: (v: string) => void) => {
+    const n = raw.replace(/\D/g, "");
+    fn(n ? Number(n).toLocaleString("ko-KR") : "");
+  };
+
+  return (
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title={c.name} onBack={onBack} />
+      <UnpaidBar customerId={c.id} />
+      <div className="tr-card">
+        <h4>수금</h4>
+        <p className="tr-hint pay">결제수단</p>
+        <div className="pay-row">
+          <span>현금</span>
+          <input
+            inputMode="numeric"
+            placeholder="0"
+            value={cash}
+            onChange={(e) => setAmt(e.target.value, setCash)}
+          />
+          <button className="btn sm ink" type="button" onClick={() => nav.setToast("현금영수증 화면으로 연결됩니다")}>
+            현금영수증
+          </button>
+        </div>
+        <div className="pay-row">
+          <span>카드</span>
+          <input
+            inputMode="numeric"
+            placeholder="0"
+            value={card}
+            onChange={(e) => setAmt(e.target.value, setCard)}
+          />
+        </div>
+        <div className="pay-row">
+          <span>무이자혜택</span>
+          <button className="btn sm ink" type="button" onClick={() => nav.setToast("무이자 혜택을 조회했습니다")}>
+            혜택조회
+          </button>
+        </div>
+        <div className="pay-row">
+          <span>결제구분</span>
+          <div className="pay-radios">
+            <label>
+              <input type="radio" checked={payKind === "approve"} onChange={() => setPayKind("approve")} />
+              카드승인
+            </label>
+            <label>
+              <input type="radio" checked={payKind === "slip"} onChange={() => setPayKind("slip")} />
+              카드전표
+            </label>
+          </div>
+        </div>
+        <div className="tr-sum">
+          <span>수금합계</span>
+          <b>{krw(collectTotal)}</b>
+        </div>
+        <div className="tr-sum">
+          <span>수금 후 미수금</span>
+          <b className={unpaidAfter ? "bad" : ""}>{unpaidAfter ? krw(unpaidAfter) : "없음"}</b>
+        </div>
+        <button className="btn primary" type="button" onClick={() => nav.setToast("수금이 등록되었습니다")}>
+          수금 등록
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -176,105 +433,6 @@ export function OrderScreen() {
         <div style={{ height: 12 }} />
         <button className="btn primary" type="button" onClick={() => nav.setToast("본품 주문이 접수되었습니다")}>
           주문하기
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function SalesScreen() {
-  const nav = useNav();
-  const [cid, setCid] = useState(nav.customerId || customers[0].id);
-  const [pid, setPid] = useState(products[0].id);
-  const p = products.find((x) => x.id === pid)!;
-  return (
-    <div className="app-scroll">
-      <TopBar title="판매 등록" onBack={nav.back} />
-      <div className="pad">
-        <div className="field">
-          <label>고객</label>
-          <select value={cid} onChange={(e) => setCid(e.target.value)}>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>제품</label>
-          <select value={pid} onChange={(e) => setPid(e.target.value)}>
-            {products.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.brand} {x.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="card" style={{ padding: 14, marginBottom: 16 }}>
-          <div className="kv" style={{ padding: 0 }}>
-            <div className="k">판매금액</div>
-            <div>{krw(p.price)}</div>
-            <div className="k">판매일</div>
-            <div>2026-08-22</div>
-            <div className="k">방식</div>
-            <div>대면 판매</div>
-          </div>
-        </div>
-        <button
-          className="btn primary"
-          type="button"
-          onClick={() => nav.setToast("판매가 등록되었습니다. 이어서 수금을 등록하세요.")}
-        >
-          판매 등록
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function CollectionScreen() {
-  const nav = useNav();
-  const unpaid = customers.filter((c) => c.unpaid > 0);
-  const [cid, setCid] = useState(unpaid[0]?.id ?? customers[0].id);
-  const c = customers.find((x) => x.id === cid)!;
-  const [amt, setAmt] = useState(String(c.unpaid || 100000));
-  return (
-    <div className="app-scroll">
-      <TopBar title="수금 등록" onBack={nav.back} />
-      <div className="notice">일반 쇼핑몰은 결제 = 판매 완료입니다. 뉴커머스는 판매 ≠ 수금입니다.</div>
-      <div className="pad">
-        <div className="field">
-          <label>고객</label>
-          <select
-            value={cid}
-            onChange={(e) => {
-              setCid(e.target.value);
-              const n = customers.find((x) => x.id === e.target.value);
-              setAmt(String(n?.unpaid || 0));
-            }}
-          >
-            {customers.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.name} {x.unpaid ? `(미수 ${krw(x.unpaid)})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>수금 금액</label>
-          <input value={amt} onChange={(e) => setAmt(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>방식</label>
-          <select defaultValue="va">
-            <option value="va">가상계좌 입금</option>
-            <option value="branch">영업점 입금</option>
-            <option value="cash">현금</option>
-          </select>
-        </div>
-        <button className="btn primary" type="button" onClick={() => nav.setToast("수금이 등록되었습니다")}>
-          수금 등록
         </button>
       </div>
     </div>

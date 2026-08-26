@@ -14,8 +14,8 @@ import {
   IconWon,
 } from "./icons";
 import { NavContext, type NavState } from "./nav";
-import { BoardScreen, ChatScreen, LinksScreen, MessageScreen } from "./screens/Ai";
-import { CustomerScreen, CustomersScreen, NoteScreen, SkinDiagScreen } from "./screens/Customers";
+import { BoardScreen, ChatScreen, LinksScreen, MessageScreen, PushScreen } from "./screens/Ai";
+import { CustomerScreen, CustomersScreen, GuestSkinScreen, NoteScreen, SkinDiagScreen } from "./screens/Customers";
 import { HomeScreen } from "./screens/Home";
 import { LoginScreen, MfaScreen } from "./screens/Login";
 import {
@@ -43,6 +43,7 @@ import {
   OrderScreen,
   PromoScreen,
   SalesScreen,
+  SlipsScreen,
   TradeScreen,
   WorkScreen,
 } from "./screens/Work";
@@ -63,10 +64,10 @@ function isAuthed(screen: ScreenId) {
 }
 
 function activeTabOf(screen: ScreenId): ScreenId {
-  if (screen === "customer" || screen === "message" || screen === "skindiag" || screen === "note") return "customers";
+  if (screen === "customer" || screen === "message" || screen === "skindiag" || screen === "guestskin" || screen === "note") return "customers";
   if (tabScreens.has(screen)) return screen;
   if (["promo", "order", "stock"].includes(screen)) return "work";
-  if (["sales", "collection"].includes(screen)) return "trade";
+  if (["slips", "sales", "collection"].includes(screen)) return "trade";
   if (
     [
       "status",
@@ -86,6 +87,7 @@ function activeTabOf(screen: ScreenId): ScreenId {
       "chat",
       "links",
       "board",
+      "push",
     ].includes(screen)
   ) {
     return "mypage";
@@ -109,6 +111,8 @@ function ScreenInner({ screen }: { screen: ScreenId }) {
       return <MessageScreen />;
     case "skindiag":
       return <SkinDiagScreen />;
+    case "guestskin":
+      return <GuestSkinScreen />;
     case "note":
       return <NoteScreen />;
     case "chat":
@@ -117,6 +121,8 @@ function ScreenInner({ screen }: { screen: ScreenId }) {
       return <LinksScreen />;
     case "board":
       return <BoardScreen />;
+    case "push":
+      return <PushScreen />;
     case "work":
       return <WorkScreen />;
     case "promo":
@@ -125,6 +131,8 @@ function ScreenInner({ screen }: { screen: ScreenId }) {
       return <OrderScreen />;
     case "trade":
       return <TradeScreen />;
+    case "slips":
+      return <SlipsScreen />;
     case "sales":
       return <SalesScreen />;
     case "collection":

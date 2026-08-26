@@ -108,7 +108,7 @@ export function HomeScreen() {
 
       <button className="hq-board" type="button" onClick={() => nav.go("board")}>
         <div className="hq-board-h">
-          <b>본사발신 게시판</b>
+          <b>게시판</b>
           <span>
             더보기
             <IconChevron width={14} height={14} />
@@ -122,6 +122,24 @@ export function HomeScreen() {
           </div>
         ))}
       </button>
+
+      <nav className="home-links" aria-label="바로가기">
+        <button
+          type="button"
+          onClick={() => nav.setToast("에딧샵으로 연결됩니다. 로컬 프로토타입에서는 이동하지 않습니다.")}
+        >
+          에딧샵
+        </button>
+        <button
+          type="button"
+          onClick={() => nav.setToast("뷰티스퀘어로 연결됩니다. 로컬 프로토타입에서는 이동하지 않습니다.")}
+        >
+          뷰티스퀘어
+        </button>
+        <button type="button" className="in" onClick={() => nav.go("guestskin")}>
+          피부진단
+        </button>
+      </nav>
 
       <div className="home-title">
         <h3>오늘 확인할 고객</h3>

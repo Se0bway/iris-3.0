@@ -53,17 +53,8 @@ export function AppHeader() {
         <span className="iris-word">IRIS</span>
       </button>
       <div className="header-actions">
-        <button className="icon-btn" type="button" onClick={() => nav.go("board")} aria-label="알림">
+        <button className="icon-btn" type="button" onClick={() => nav.go("push")} aria-label="알림">
           <IconBell width={18} height={18} />
-        </button>
-        <button
-          className="icon-btn"
-          type="button"
-          onClick={() => nav.go("profile")}
-          aria-label="내 정보"
-          style={{ padding: 0, overflow: "hidden" }}
-        >
-          <img className="header-avatar" src={photoUrl("me")} alt="" />
         </button>
       </div>
     </header>

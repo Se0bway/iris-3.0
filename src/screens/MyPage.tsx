@@ -1,18 +1,24 @@
-import { useState } from "react";
-import { closing, counselor, hqEducations, members, products, RANKS } from "../data";
+import { useMemo, useState } from "react";
+import { closing, counselor, deposits, hqEducations, members, products, RANKS, vaAccount } from "../data";
 import { krw } from "../lib";
 import { useNav } from "../nav";
-import { AppHeader, PersonRow, Photo, TopBar } from "../ui";
-import { IconChevron } from "../icons";
+import { AppHeader, Photo, TopBar } from "../ui";
+import { IconChevron, IconCrown, IconSearch } from "../icons";
 
 const stockQty = products.reduce((s, p) => s + p.stock, 0);
 const stockAmt = products.reduce((s, p) => s + p.stock * p.price, 0);
+const stockBrands = ["전체", ...[...new Set(products.map((p) => p.brand))]];
 const attendDays = 14;
 const liveDone = 8;
 const liveTotal = 12;
 const incentiveEst = 1_860_000;
 const ownSales = 8_240_000;
+const editShopSales = 4_120_000;
 const editCommission = 328_000;
+const incentiveMembers = members.filter((m) => m.incentive).length;
+const normalMembers = members.length;
+const groupSales = members.reduce((s, m) => s + m.sales, 0);
+const branchUndeposited = closing.collected - closing.deposited;
 
 function CardHead({ title }: { title: string }) {
   return (
@@ -54,23 +60,70 @@ export function MyPageScreen() {
               <Photo id="me" name={counselor.name} size={64} />
               <div>
                 <h4>{counselor.name}</h4>
-                <p>
-                  {counselor.rank} · {counselor.branch}
+                <p className="mp-idline">
+                  <span>{counselor.no}</span>
+                  <i />
+                  <span className="mp-rank">
+                    <IconCrown width={13} height={13} />
+                    {counselor.rank}
+                  </span>
                 </p>
+                <p>{counselor.branch}</p>
               </div>
             </button>
             <button className="rank-chip" type="button" onClick={() => nav.go("rank")}>
               직급
             </button>
           </div>
-          <div className="mp-profile-stats">
-            <button className="mp-stat" type="button" onClick={() => nav.go("incentive")}>
-              <div className="l">예상 인센티브</div>
-              <div className="v">{krw(incentiveEst)}</div>
+          <button className="mp-team" type="button" onClick={() => nav.go("members")}>
+            <div className="mp-team-h">
+              <b>그룹원 상태 요약</b>
+              <IconChevron width={16} height={16} />
+            </div>
+            <div className="mp-team-inline">
+              <span>
+                <em>{incentiveMembers}명</em>수혜예상
+              </span>
+              <i />
+              <span>
+                <em>{normalMembers}명</em>정상
+              </span>
+              <i />
+              <span>
+                <em>{krw(groupSales)}</em>총원매출
+              </span>
+            </div>
+          </button>
+          <div className="mp-types">
+            <button className="mp-type" type="button" onClick={() => nav.go("incentive")}>
+              <span className="mp-type-tag">A타입</span>
+              <div className="mp-type-main">
+                <div className="l">당월 고객판매</div>
+                <div className="v">{krw(closing.customerSales)}</div>
+              </div>
+              <div className="mp-type-subs">
+                <div>
+                  <div className="l">예상 인센티브</div>
+                  <div className="v">{krw(incentiveEst)}</div>
+                </div>
+                <div>
+                  <div className="l">미수회전일</div>
+                  <div className="v">{closing.rotationDays}일</div>
+                </div>
+              </div>
             </button>
-            <button className="mp-stat" type="button" onClick={() => nav.go("editshop")}>
-              <div className="l">에딧샵 커미션</div>
-              <div className="v">{krw(editCommission)}</div>
+            <button className="mp-type" type="button" onClick={() => nav.go("editshop")}>
+              <span className="mp-type-tag">B타입</span>
+              <div className="mp-type-main">
+                <div className="l">에딧샵 매출</div>
+                <div className="v">{krw(editShopSales)}</div>
+              </div>
+              <div className="mp-type-subs one">
+                <div>
+                  <div className="l">에딧샵 커미션</div>
+                  <div className="v">{krw(editCommission)}</div>
+                </div>
+              </div>
             </button>
           </div>
         </div>
@@ -86,6 +139,21 @@ export function MyPageScreen() {
               <div className="l">오늘</div>
               <div className="v">{nav.checkedIn ? "출근완료!" : "미출근"}</div>
             </div>
+          </div>
+        </button>
+
+        <button className="mp-card" type="button" onClick={() => nav.go("live")}>
+          <CardHead title="라이브 영상 시청횟수" />
+          <div className="mp-metrics one">
+            <div className="mp-metric">
+              <div className="l">시청완료 / 전체 영상</div>
+              <div className="v">
+                {liveDone} / {liveTotal}
+              </div>
+            </div>
+          </div>
+          <div className="progress" style={{ marginTop: 10 }}>
+            <i style={{ width: `${(liveDone / liveTotal) * 100}%` }} />
           </div>
         </button>
 
@@ -107,20 +175,48 @@ export function MyPageScreen() {
           </div>
         </button>
 
-        <button className="mp-card" type="button" onClick={() => nav.go("live")}>
-          <CardHead title="라이브 영상 시청횟수" />
-          <div className="mp-metrics one">
-            <div className="mp-metric">
-              <div className="l">시청완료 / 전체 영상</div>
-              <div className="v">
-                {liveDone} / {liveTotal}
+        <div className="mp-snap">
+          {[
+            {
+              id: "collection" as const,
+              title: "수금 정보",
+              left: { l: "전체수금", v: krw(closing.collected) },
+              right: { l: "영업점 미입금", v: krw(branchUndeposited) },
+            },
+            {
+              id: "stock" as const,
+              title: "재고 정보",
+              left: { l: "재고합계", v: `${stockQty}개` },
+              right: { l: "가격합계", v: krw(stockAmt) },
+            },
+          ].map((it) => (
+            <button key={it.id} className="mp-snap-row" type="button" onClick={() => nav.go(it.id)}>
+              <div className="mp-snap-main">
+                <b>{it.title}</b>
+                <div className="mp-snap-pair">
+                  <div>
+                    <span>{it.left.l}</span>
+                    <em>{it.left.v}</em>
+                  </div>
+                  <div>
+                    <span>{it.right.l}</span>
+                    <em>{it.right.v}</em>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="progress" style={{ marginTop: 10 }}>
-            <i style={{ width: `${(liveDone / liveTotal) * 100}%` }} />
-          </div>
-        </button>
+              <IconChevron width={16} height={16} />
+            </button>
+          ))}
+        </div>
+
+        <div className="mp-foot">
+          <button className="btn primary" type="button" onClick={() => nav.go("profile")}>
+            내정보확인
+          </button>
+          <button className="btn outline" type="button" onClick={() => nav.go("deposit")}>
+            가상계좌 입금내역
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -374,10 +470,43 @@ export function ProfileScreen() {
 
 export function StockScreen() {
   const nav = useNav();
+  const [q, setQ] = useState("");
+  const [brand, setBrand] = useState("전체");
+  const list = useMemo(() => {
+    const key = q.trim().toLowerCase().replace(/-/g, "");
+    return products.filter((p) => {
+      const byBrand = brand === "전체" || p.brand === brand;
+      const bySearch =
+        !key ||
+        p.name.toLowerCase().includes(key) ||
+        p.brand.toLowerCase().includes(key) ||
+        p.code.replace(/-/g, "").toLowerCase().includes(key);
+      return byBrand && bySearch;
+    });
+  }, [q, brand]);
+
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
       <TopBar title="재고조회" onBack={nav.back} />
+      <div className="search">
+        <IconSearch />
+        <input
+          placeholder="상품명, 상품코드"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
       <div className="pad">
+        <label className="tr-brand-field">
+          <span>브랜드</span>
+          <select value={brand} onChange={(e) => setBrand(e.target.value)}>
+            {stockBrands.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="kpi-grid" style={{ padding: 0, marginBottom: 12 }}>
           <div className="kpi">
             <div className="lbl">재고합계</div>
@@ -391,17 +520,23 @@ export function StockScreen() {
           </div>
         </div>
         <div className="card list-card">
-          {products.map((p) => (
-            <div className="row" key={p.id}>
-              <div className="meta">
-                <b>
-                  {p.brand} {p.name}
-                </b>
-                <p>{krw(p.price)}</p>
+          {list.length === 0 ? (
+            <p className="empty">검색 결과가 없습니다.</p>
+          ) : (
+            list.map((p) => (
+              <div className="row" key={p.id}>
+                <div className="meta">
+                  <b>
+                    {p.brand} {p.name}
+                  </b>
+                  <p>
+                    {p.code} · {krw(p.price)}
+                  </p>
+                </div>
+                <div className="right amt">{p.stock}개</div>
               </div>
-              <div className="right amt">{p.stock}개</div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -411,22 +546,47 @@ export function StockScreen() {
 export function MembersScreen() {
   const nav = useNav();
   return (
-    <div className="app-scroll">
-      <TopBar title="그룹원" onBack={nav.back} />
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title="그룹원 상태 요약" onBack={nav.back} />
       <div className="pad">
-        <div className="card" style={{ padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: "var(--muted)" }}>그룹 매출</div>
-          <div className="big-num">{krw(41200000)}</div>
+        <div className="mp-snap" style={{ marginBottom: 12 }}>
+          <div className="mp-snap-row" style={{ pointerEvents: "none" }}>
+            <div className="mp-snap-main">
+              <b>그룹 현황</b>
+              <div className="mp-snap-pair">
+                <div>
+                  <span>인센티브 수혜예상</span>
+                  <em>{incentiveMembers}명</em>
+                </div>
+                <div>
+                  <span>정상 그룹원</span>
+                  <em>{normalMembers}명</em>
+                </div>
+              </div>
+              <div className="mp-team-sales">
+                <span>그룹원 총원 매출</span>
+                <em>{krw(groupSales)}</em>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="card list-card">
           {members.map((m) => (
-            <PersonRow
-              key={m.id}
-              id={m.id}
-              name={m.name}
-              meta={`${m.rank} · ${m.education}`}
-              right={<span className="amt">{krw(m.sales)}</span>}
-            />
+            <div className="mb-row" key={m.id}>
+              <Photo id={m.id} name={m.name} size={40} />
+              <div className="mb-meta">
+                <b>{m.name}</b>
+                <p>
+                  {m.rank} · {krw(m.sales)}
+                </p>
+                <div className="mb-flags">
+                  <span>미수회전일 {m.rotationDays}일</span>
+                  <span className={`badge ${m.incentive ? "green" : "gray"}`}>
+                    {m.incentive ? "인센티브 수혜예상" : "인센티브 비대상"}
+                  </span>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -436,15 +596,164 @@ export function MembersScreen() {
 
 export function DepositScreen() {
   const nav = useNav();
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [kind, setKind] = useState("전체");
+  const [from, setFrom] = useState("2026-08-01");
+  const [to, setTo] = useState("2026-08-31");
+  const [applied, setApplied] = useState({ kind: "전체", from: "2026-08-01", to: "2026-08-31" });
+  const list = useMemo(() => {
+    return deposits.filter((d) => {
+      const byKind = applied.kind === "전체" || d.status === applied.kind;
+      const day = d.requestedAt.slice(0, 10).replace(/\./g, "-");
+      const byDate = day >= applied.from && day <= applied.to;
+      return byKind && byDate;
+    });
+  }, [applied]);
+
+  if (pickedId) {
+    const d = deposits.find((x) => x.id === pickedId) ?? deposits[0];
+    return <VaDetail deposit={d} onBack={() => setPickedId(null)} />;
+  }
+
   return (
-    <div className="app-scroll">
-      <TopBar title="입금내역" onBack={nav.back} />
-      <div className="notice">입금 상세는 판매/수금 탭의 수금 등록과 함께 사용합니다.</div>
-      <div className="pad">
-        <button className="btn primary" type="button" onClick={() => nav.go("collection")}>
-          수금 등록으로 이동
-        </button>
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title="가상계좌 입금내역" onBack={nav.back} />
+      <div className="va-acc">
+        <div>
+          <span>입금은행</span>
+          <b>{vaAccount.bank}</b>
+        </div>
+        <div>
+          <span>계좌번호</span>
+          <b className="num">{vaAccount.number}</b>
+        </div>
       </div>
+      <div className="va-filter">
+        <label className="tr-brand-field">
+          <span>처리구분</span>
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="전체">전체</option>
+            <option value="처리">처리</option>
+            <option value="미처리">미처리</option>
+          </select>
+        </label>
+        <div className="va-dates">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <span>~</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <button
+            className="btn sm primary"
+            type="button"
+            onClick={() => setApplied({ kind, from, to })}
+          >
+            조회
+          </button>
+        </div>
+      </div>
+      <div className="va-list">
+        {list.length === 0 ? (
+          <p className="empty">조회 결과가 없습니다.</p>
+        ) : (
+          list.map((d) => (
+            <div className="va-item" key={d.id}>
+              <div className="va-item-h">
+                <b>{krw(d.amount)}</b>
+                <span className={`badge ${d.status === "처리" ? "blue" : "amber"}`}>{d.status}</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>입금은행</dt>
+                  <dd>{d.bank}</dd>
+                </div>
+                <div>
+                  <dt>입금요청 일자</dt>
+                  <dd>{d.requestedAt}</dd>
+                </div>
+                <div>
+                  <dt>입금처리 일자</dt>
+                  <dd>{d.processedAt ?? "-"}</dd>
+                </div>
+              </dl>
+              <button className="btn outline" type="button" onClick={() => setPickedId(d.id)}>
+                상세보기
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VaDetail({
+  deposit,
+  onBack,
+}: {
+  deposit: (typeof deposits)[number];
+  onBack: () => void;
+}) {
+  const [extra, setExtra] = useState("0");
+  const [promo, setPromo] = useState("0");
+  const extraN = Number(extra.replace(/\D/g, "")) || 0;
+  const promoN = Number(promo.replace(/\D/g, "")) || 0;
+  const requestAmt = deposit.selected + extraN + promoN;
+  const setNum = (raw: string, fn: (v: string) => void) => {
+    const n = raw.replace(/\D/g, "");
+    fn(n ? String(Number(n)) : "0");
+  };
+
+  return (
+    <div className="app-scroll" style={{ background: "#fff" }}>
+      <TopBar title="가상계좌 등록요청" onBack={onBack} />
+      <p className="va-note">※가상계좌에 입금한 대상 금액을 선택하여 주세요.</p>
+      <div className="va-sum">
+        <div>
+          <span>가상계좌 입금금액</span>
+          <b>{krw(deposit.amount)}</b>
+        </div>
+        <div>
+          <span>영업점 처리요청액(①+②+③)</span>
+          <b>{krw(requestAmt)}</b>
+        </div>
+      </div>
+      <div className="va-box">
+        <div>
+          <span>① 수금내역 선택금액 (포인트제외)</span>
+          <em>{krw(deposit.selected)}</em>
+        </div>
+        <label>
+          <span>② 기타 상품대(IRIS)</span>
+          <input inputMode="numeric" value={extra} onChange={(e) => setNum(e.target.value, setExtra)} />
+          <i>원</i>
+        </label>
+        <label>
+          <span>③ 유상판촉 대금</span>
+          <input inputMode="numeric" value={promo} onChange={(e) => setNum(e.target.value, setPromo)} />
+          <i>원</i>
+        </label>
+      </div>
+      {deposit.items.length === 0 ? (
+        <p className="empty">연결된 수금내역이 없습니다.</p>
+      ) : (
+        deposit.items.map((it) => (
+          <div className="va-cust" key={`${it.no}-${it.at}`}>
+            <div>
+              <span>고객번호</span>
+              <b>
+                {it.no} | {it.name}
+              </b>
+            </div>
+            <div>
+              <span>{it.method}</span>
+              <b>{krw(it.amount)}</b>
+            </div>
+            <div>
+              <span>수금일시</span>
+              <em>{it.at}</em>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }

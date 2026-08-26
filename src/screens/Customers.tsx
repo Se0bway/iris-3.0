@@ -9,6 +9,7 @@ import {
   IconBell,
   IconCake,
   IconCalendar,
+  IconChat,
   IconHome,
   IconPhone,
   IconScan,
@@ -143,7 +144,7 @@ export function CustomerScreen() {
         onBack={nav.back}
         right={
           <div className="cd-top-right">
-            <button className="icon-btn" type="button" onClick={() => nav.go("board")} aria-label="알림">
+            <button className="icon-btn" type="button" onClick={() => nav.go("push")} aria-label="알림">
               <IconBell width={18} height={18} />
             </button>
             <button className="cd-ai-btn" type="button" onClick={() => nav.go("chat")}>
@@ -178,22 +179,23 @@ export function CustomerScreen() {
               <span className={`badge ${plcc ? "blue" : "amber"}`}>{plcc ? "PLCC 발급" : "PLCC 미발급"}</span>
             </div>
           </div>
+          <div className="cd-contact">
+            <button className="tel" type="button" onClick={() => nav.setToast("전화 앱으로 연결됩니다")} aria-label="전화">
+              <IconPhone width={18} height={18} />
+            </button>
+            <button type="button" onClick={() => nav.setToast("문자 앱으로 연결됩니다")} aria-label="문자">
+              <IconChat width={18} height={18} />
+            </button>
+          </div>
         </div>
         <div className="cd-acts">
           <button type="button" onClick={() => nav.go("sales", { customerId: c.id })}>
             판매/수금 등록
           </button>
-          <button className="tel" type="button" onClick={() => nav.setToast("전화 앱으로 연결됩니다")}>
-            전화
-          </button>
-          <button type="button" onClick={() => nav.setToast("문자 앱으로 연결됩니다")}>
-            문자
-          </button>
-          <button type="button" onClick={() => nav.setToast("카카오톡으로 연결됩니다")}>
-            카카오톡
+          <button type="button" onClick={() => nav.go("skindiag", { customerId: c.id })}>
+            AI 피부진단
           </button>
           <button
-            className="on"
             type="button"
             onClick={() =>
               nav.go("message", {
@@ -202,7 +204,7 @@ export function CustomerScreen() {
               })
             }
           >
-            메시지 생성
+            AI 추천 메세지
           </button>
         </div>
       </div>
@@ -518,6 +520,88 @@ export function SkinDiagScreen() {
           링크 발송
         </button>
       </div>
+    </div>
+  );
+}
+
+export function GuestSkinScreen() {
+  const nav = useNav();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [done, setDone] = useState(false);
+  const scores = [
+    { label: "수분", value: 42 },
+    { label: "유분", value: 61 },
+    { label: "탄력", value: 48 },
+    { label: "색소", value: 55 },
+  ];
+
+  return (
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title="피부진단" onBack={nav.back} />
+      <div className="gs-hero">
+        <img src="/logos/skindiag.png" alt="" />
+        <h3>방문객 AI 피부진단</h3>
+        <p>고객 등록 없이, 매장을 방문한 분을 바로 진단합니다.</p>
+      </div>
+      {!done ? (
+        <div className="pad">
+          <div className="gs-cam">
+            <span>얼굴이 화면 안에 들어오게 안내하세요</span>
+          </div>
+          <div className="field">
+            <label>이름 (선택)</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="방문객 이름" />
+          </div>
+          <div className="field">
+            <label>연락처 (선택)</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" />
+          </div>
+          <button className="btn primary" type="button" onClick={() => setDone(true)}>
+            <IconScan width={18} height={18} />
+            진단 시작
+          </button>
+        </div>
+      ) : (
+        <div className="pad">
+          <div className="gs-result">
+            <b>{name || "방문객"} 진단 결과</b>
+            <p>수분·탄력이 낮고 유분이 다소 높습니다. 장벽 케어 라인부터 제안하세요.</p>
+          </div>
+          <div className="dx-scores" style={{ margin: "0 0 12px" }}>
+            {scores.map((s) => (
+              <div className="dx-row" key={s.label}>
+                <div className="lab">
+                  <span>{s.label}</span>
+                  <span>{s.value}</span>
+                </div>
+                <div className="dx-bar">
+                  <i style={{ width: `${s.value}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="gs-reco">
+            <span>추천</span>
+            <p>설화수 자음생크림 · 윤조에센스</p>
+          </div>
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() => nav.setToast("진단 결과를 카카오톡으로 공유했습니다")}
+          >
+            결과 공유
+          </button>
+          <button
+            className="btn outline"
+            style={{ marginTop: 8 }}
+            type="button"
+            onClick={() => nav.go("customers")}
+          >
+            고객으로 등록
+          </button>
+        </div>
+      )}
     </div>
   );
 }
