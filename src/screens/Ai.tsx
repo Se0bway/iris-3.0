@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { customers, homeGroups, pushNotices } from "../data";
+import { homeGroups, pushNotices } from "../data";
 import { draftMessage, messageTypeLabel } from "../lib";
 import { useNav } from "../nav";
+import { useConsults } from "../consult";
 import type { MessageType } from "../types";
 import { TopBar } from "../ui";
 import { IconCopy, IconRefresh, IconSend } from "../icons";
@@ -17,7 +18,8 @@ const types: MessageType[] = [
 
 export function MessageScreen() {
   const nav = useNav();
-  const c = customers.find((x) => x.id === nav.customerId) ?? customers[0];
+  const { list } = useConsults();
+  const c = list.find((x) => x.id === nav.customerId) ?? list[0];
   const [type, setType] = useState<MessageType>(nav.messageType);
   const [seed, setSeed] = useState(0);
   const text = useMemo(() => {
@@ -87,7 +89,7 @@ function botReply(q: string) {
     return "뉴커머스는 판매와 수금이 분리됩니다. 미처리 가상계좌 18만원이 있습니다. 수금 등록 또는 입금내역에서 고객과 매칭하세요.";
   }
   if (/프로모션|판촉/.test(q)) {
-    return "8월 자음생 체험키트와 헤라 쿠션 샘플이 진행 중입니다. 판촉 주문 화면에서 수량만 넣으면 됩니다.";
+    return "8월 자음생 체험키트와 헤라 쿠션 샘플이 진행 중입니다. 본품 주문·재고조회에서 수량을 확인하세요.";
   }
   if (/제도|업무|에딧|뷰티/.test(q)) {
     return "에딧샵·뷰티스퀘어는 링크모음에서 외부로 연결됩니다. 공지는 NEXT 게시판과 연동됩니다.";

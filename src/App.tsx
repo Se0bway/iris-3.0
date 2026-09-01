@@ -15,7 +15,7 @@ import {
 } from "./icons";
 import { NavContext, type NavState } from "./nav";
 import { BoardScreen, ChatScreen, LinksScreen, MessageScreen, PushScreen } from "./screens/Ai";
-import { CustomerScreen, CustomersScreen, GuestSkinScreen, NoteScreen, SkinDiagScreen } from "./screens/Customers";
+import { CustomerScreen, CustomersScreen, GuestSkinScreen, NoteScreen, RegisterScreen, SkinDiagScreen } from "./screens/Customers";
 import { HomeScreen } from "./screens/Home";
 import { LoginScreen, MfaScreen } from "./screens/Login";
 import {
@@ -64,7 +64,7 @@ function isAuthed(screen: ScreenId) {
 }
 
 function activeTabOf(screen: ScreenId): ScreenId {
-  if (screen === "customer" || screen === "message" || screen === "skindiag" || screen === "guestskin" || screen === "note") return "customers";
+  if (screen === "customer" || screen === "message" || screen === "skindiag" || screen === "guestskin" || screen === "note" || screen === "register") return "customers";
   if (tabScreens.has(screen)) return screen;
   if (["promo", "order", "stock"].includes(screen)) return "work";
   if (["slips", "sales", "collection"].includes(screen)) return "trade";
@@ -115,6 +115,8 @@ function ScreenInner({ screen }: { screen: ScreenId }) {
       return <GuestSkinScreen />;
     case "note":
       return <NoteScreen />;
+    case "register":
+      return <RegisterScreen />;
     case "chat":
       return <ChatScreen />;
     case "links":
@@ -183,18 +185,22 @@ export default function App() {
     toast: "",
     checkedIn: false,
     fabsHidden: false,
+    draftName: "",
+    draftPhone: "",
   });
 
   const api = useMemo(
     () => ({
       ...state,
-      go: (screen: ScreenId, extra?: { customerId?: string; messageType?: MessageType }) => {
+      go: (screen: ScreenId, extra?: { customerId?: string; messageType?: MessageType; name?: string; phone?: string }) => {
         setState((s) => ({
           ...s,
           stack: s.screen === screen ? s.stack : [...s.stack, s.screen],
           screen,
           customerId: extra?.customerId ?? s.customerId,
           messageType: extra?.messageType ?? s.messageType,
+          draftName: screen === "register" ? extra?.name ?? "" : extra && "name" in extra ? extra.name ?? "" : s.draftName,
+          draftPhone: screen === "register" ? extra?.phone ?? "" : extra && "phone" in extra ? extra.phone ?? "" : s.draftPhone,
         }));
       },
       back: () => {
@@ -270,7 +276,7 @@ export default function App() {
               </div>
               <div className="app">
                 <ScreenInner screen={state.screen} />
-                {isAuthed(state.screen) ? (
+                {isAuthed(state.screen) && state.screen !== "register" ? (
                   state.fabsHidden ? (
                     <button
                       className={`fab-peek ${state.screen === "chat" ? "over-chat" : ""}`}
@@ -328,8 +334,8 @@ export default function App() {
                             aria-label="마이오피스"
                           >
                             <span className="office-btn">
-                              <span>MY</span>
-                              <span>OFFICE</span>
+                              <span>마이</span>
+                              <span>오피스</span>
                             </span>
                           </button>
                         );

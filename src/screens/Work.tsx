@@ -1,13 +1,19 @@
 import { useMemo, useState } from "react";
-import { counselor, customers, products, promos } from "../data";
+import { counselor, products, promos } from "../data";
 import { krw } from "../lib";
 import { useNav } from "../nav";
+import { useConsults } from "../consult";
 import { IconBox, IconChevron, IconSearch } from "../icons";
-import { AppHeader, Photo, TopBar } from "../ui";
+import { AppHeader, TopBar } from "../ui";
 
 const stockQty = products.reduce((s, p) => s + p.stock, 0);
 const stockAmt = products.reduce((s, p) => s + p.stock * p.price, 0);
 const productBrands = ["전체", ...[...new Set(products.map((p) => p.brand))]];
+
+function useCustomer(id: string) {
+  const { list } = useConsults();
+  return list.find((x) => x.id === id) ?? list[0];
+}
 
 export function WorkScreen() {
   const nav = useNav();
@@ -47,7 +53,6 @@ export function WorkScreen() {
       <div className="pad">
         <div className="card list-card">
           {[
-            { id: "promo" as const, title: "판촉 주문", desc: "체험키트 · 샘플 주문" },
             { id: "order" as const, title: "본품 주문", desc: "재고 확인 후 발주" },
             { id: "stock" as const, title: "재고조회", desc: "본인 재고 수량 · 가격합계" },
           ].map((it) => (
@@ -135,12 +140,13 @@ function CustomerPick({
   onBack: () => void;
 }) {
   const [q, setQ] = useState("");
+  const { list: people } = useConsults();
   const list = useMemo(() => {
     const key = q.replace(/-/g, "");
-    return customers.filter(
+    return people.filter(
       (c) => !q || c.name.includes(q) || c.phone.replace(/-/g, "").includes(key)
     );
-  }, [q]);
+  }, [q, people]);
 
   return (
     <div className="app-scroll">
@@ -156,7 +162,6 @@ function CustomerPick({
           ) : (
             list.map((c) => (
               <button key={c.id} className="person" type="button" onClick={() => onPick(c.id)}>
-                <Photo id={c.id} name={c.name} size={46} gender={c.gender} />
                 <span className="who">
                   <span className="name-row">
                     <b>{c.name}</b>
@@ -176,7 +181,7 @@ function CustomerPick({
 }
 
 function UnpaidBar({ customerId }: { customerId: string }) {
-  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  const c = useCustomer(customerId);
   return (
     <div className="tr-unpaid">
       <div>
@@ -188,7 +193,7 @@ function UnpaidBar({ customerId }: { customerId: string }) {
 }
 
 function SlipsPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
-  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  const c = useCustomer(customerId);
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
       <TopBar title={c.name} onBack={onBack} />
@@ -217,7 +222,7 @@ function SlipsPage({ customerId, onBack }: { customerId: string; onBack: () => v
 
 function SalesPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
   const nav = useNav();
-  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  const c = useCustomer(customerId);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [brand, setBrand] = useState("전체");
   const list = brand === "전체" ? products : products.filter((p) => p.brand === brand);
@@ -295,7 +300,7 @@ function SalesPage({ customerId, onBack }: { customerId: string; onBack: () => v
 
 function CollectPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
   const nav = useNav();
-  const c = customers.find((x) => x.id === customerId) ?? customers[0];
+  const c = useCustomer(customerId);
   const [cash, setCash] = useState("");
   const [card, setCard] = useState("");
   const [payKind, setPayKind] = useState<"approve" | "slip">("approve");

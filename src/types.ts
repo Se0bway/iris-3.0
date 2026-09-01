@@ -34,7 +34,8 @@ export type ScreenId =
   | "education"
   | "skindiag"
   | "guestskin"
-  | "note";
+  | "note"
+  | "register";
 
 export type Segment =
   | "new"

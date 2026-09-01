@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { closing, counselor, deposits, hqEducations, members, products, RANKS, vaAccount } from "../data";
 import { krw } from "../lib";
 import { useNav } from "../nav";
-import { AppHeader, Photo, TopBar } from "../ui";
+import { AppHeader, TopBar } from "../ui";
 import { IconChevron, IconCrown, IconSearch } from "../icons";
 
 const stockQty = products.reduce((s, p) => s + p.stock, 0);
@@ -57,7 +57,6 @@ export function MyPageScreen() {
         <div className="mp-profile">
           <div className="mp-profile-top">
             <button className="mp-profile-id" type="button" onClick={() => nav.go("profile")}>
-              <Photo id="me" name={counselor.name} size={64} />
               <div>
                 <h4>{counselor.name}</h4>
                 <p className="mp-idline">
@@ -573,7 +572,6 @@ export function MembersScreen() {
         <div className="card list-card">
           {members.map((m) => (
             <div className="mb-row" key={m.id}>
-              <Photo id={m.id} name={m.name} size={40} />
               <div className="mb-meta">
                 <b>{m.name}</b>
                 <p>

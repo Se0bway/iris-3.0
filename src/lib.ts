@@ -94,6 +94,10 @@ export function custType(c: Customer) {
   return c.customerType ?? (c.purchaseCount >= 3 ? "통합고객" : "일반고객");
 }
 
+export function custNo(id: string) {
+  return Number(id.replace(/\D/g, "")) || 1;
+}
+
 export function dueText(c: Customer) {
   const n = c.diagnosisOffset ?? c.birthdayOffset;
   if (n === 0) return "D-Day";

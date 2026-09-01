@@ -13,7 +13,7 @@ import {
 import { custType, dueText, formatDot, koreanDate, urgencyScore } from "../lib";
 import { useNav } from "../nav";
 import type { Customer } from "../types";
-import { AppHeader, Photo } from "../ui";
+import { AppHeader } from "../ui";
 
 const icons = {
   blue: IconStethoscope,
@@ -35,7 +35,6 @@ function PersonRow({
 }) {
   return (
     <button className="person" type="button" onClick={onClick}>
-      <Photo id={c.id} name={c.name} size={46} gender={c.gender} />
       <span className="who">
         <span className="name-row">
           <b>{c.name}</b>

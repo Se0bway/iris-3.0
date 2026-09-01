@@ -9,10 +9,15 @@ export interface NavState {
   toast: string;
   checkedIn: boolean;
   fabsHidden: boolean;
+  draftName: string;
+  draftPhone: string;
 }
 
 export interface NavApi extends NavState {
-  go: (screen: ScreenId, extra?: { customerId?: string; messageType?: MessageType }) => void;
+  go: (
+    screen: ScreenId,
+    extra?: { customerId?: string; messageType?: MessageType; name?: string; phone?: string }
+  ) => void;
   back: () => void;
   setToast: (msg: string) => void;
   checkIn: () => void;

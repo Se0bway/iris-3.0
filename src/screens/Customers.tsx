@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { customers } from "../data";
+import { TODAY } from "../data";
 import { useConsults } from "../consult";
-import { custType, formatDot, krw, levelLabel, segmentLabel, statusLabel, tendencyLabel } from "../lib";
+import { custNo, custType, formatDot, krw, levelLabel, statusLabel } from "../lib";
 import { useNav } from "../nav";
-import type { Customer, MessageType, Segment } from "../types";
-import { AppHeader, Photo, TopBar } from "../ui";
+import type { Customer, MessageType } from "../types";
+import { AppHeader, TopBar } from "../ui";
 import {
   IconBell,
   IconCake,
@@ -14,53 +14,100 @@ import {
   IconPhone,
   IconScan,
   IconSearch,
-  IconSparkle,
-  IconStar,
 } from "../icons";
 
-const filters: { id: "all" | Segment; label: string }[] = [
+export { RegisterScreen } from "./Register";
+
+const filters = [
   { id: "all", label: "전체" },
   { id: "new", label: "신규" },
   { id: "vip", label: "VIP" },
-  { id: "repurchase", label: "재구매 도래" },
-  { id: "churn", label: "이탈 위험" },
-  { id: "consult", label: "상담 후 미구매" },
   { id: "birthday", label: "생일" },
-];
+  { id: "points", label: "뷰티포인트 소멸 예정" },
+] as const;
+
+type FilterId = (typeof filters)[number]["id"];
+
+const yearAgo = (() => {
+  const [y, m, d] = TODAY.split("-").map(Number);
+  return `${y - 1}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+})();
+
+function yearSales(c: Customer) {
+  const sum = c.ledger.filter((r) => r.type === "sale" && r.date >= yearAgo).reduce((s, r) => s + r.amount, 0);
+  return sum || c.totalAmount;
+}
+
+function bdayKey(c: Customer) {
+  const md = c.birth.slice(5);
+  const today = TODAY.slice(5);
+  return md >= today ? `0-${md}` : `1-${md}`;
+}
+
+function bdayLabel(c: Customer) {
+  const [, m, d] = c.birth.split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
+function chipHead(seg: FilterId) {
+  if (seg === "new") return "등록일자";
+  if (seg === "vip") return "1년간 누적 구매 금액";
+  if (seg === "birthday") return "생일";
+  if (seg === "points") return "소멸예정";
+  return "고객유형";
+}
+
+function chipMeta(c: Customer, seg: FilterId) {
+  if (seg === "new") return formatDot(c.joinedAt);
+  if (seg === "vip") return krw(yearSales(c));
+  if (seg === "birthday") return bdayLabel(c);
+  if (seg === "points") return `${c.beautyPoints.toLocaleString("ko-KR")}P`;
+  return custType(c);
+}
+
+function chipSort(a: Customer, b: Customer, seg: FilterId) {
+  if (seg === "new") return b.joinedAt.localeCompare(a.joinedAt);
+  if (seg === "vip") return yearSales(b) - yearSales(a);
+  if (seg === "birthday") return bdayKey(a).localeCompare(bdayKey(b));
+  if (seg === "points") return b.beautyPoints - a.beautyPoints;
+  return custNo(a.id) - custNo(b.id);
+}
 
 export function CustomersScreen() {
   const nav = useNav();
+  const { list: customers } = useConsults();
   const [q, setQ] = useState("");
-  const [seg, setSeg] = useState<(typeof filters)[number]["id"]>("all");
-  const [sort, setSort] = useState<"recent" | "amount" | "name">("recent");
+  const [seg, setSeg] = useState<FilterId>("all");
 
   const list = useMemo(() => {
-    let rows = customers.filter((c) => {
-      const hit =
-        !q ||
-        c.name.includes(q) ||
-        c.phone.replace(/-/g, "").includes(q.replace(/-/g, ""));
-      const s = seg === "all" || c.segments.includes(seg);
-      return hit && s;
-    });
-    rows = [...rows].sort((a, b) => {
-      if (sort === "amount") return b.totalAmount - a.totalAmount;
-      if (sort === "name") return a.name.localeCompare(b.name, "ko");
-      return (a.lastPurchaseDays ?? 999) - (b.lastPurchaseDays ?? 999);
-    });
-    return rows;
-  }, [q, seg, sort]);
+    return customers
+      .filter((c) => {
+        const hit =
+          !q ||
+          c.name.includes(q) ||
+          c.phone.replace(/-/g, "").includes(q.replace(/-/g, "")) ||
+          String(custNo(c.id)).includes(q.replace(/\D/g, "") || q);
+        const s =
+          seg === "all" ||
+          (seg === "points" ? c.beautyPoints > 0 : c.segments.includes(seg));
+        return hit && s;
+      })
+      .sort((a, b) => chipSort(a, b, seg));
+  }, [q, seg, customers]);
 
   return (
     <div className="app-scroll">
       <AppHeader />
       <div className="home-title" style={{ paddingBottom: 8 }}>
         <h3>고객</h3>
+        <button className="reg-entry" type="button" onClick={() => nav.go("register", { name: "", phone: "" })}>
+          신규 등록
+        </button>
       </div>
-      <div className="search">
+      <div className="search cust-search">
         <IconSearch />
         <input
-          placeholder="고객명, 연락처"
+          placeholder="고객명, 고객번호, 연락처"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -77,33 +124,21 @@ export function CustomersScreen() {
           </button>
         ))}
       </div>
-      <div className="pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: "var(--muted)" }}>{list.length}명</span>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as typeof sort)}
-          style={{ border: 0, background: "transparent", fontSize: 12, color: "var(--ap)", fontWeight: 600 }}
-        >
-          <option value="recent">최근 구매일</option>
-          <option value="amount">구매금액</option>
-          <option value="name">이름</option>
-        </select>
-      </div>
+      <div className="pad cust-count">{list.length}명</div>
       <div className="pad">
-        <div className="card list-card">
+        <div className="card list-card cust-list">
+          <div className="cust-head">
+            <span className="cust-no">번호</span>
+            <span className="who">이름</span>
+            <span className="cust-type">{chipHead(seg)}</span>
+          </div>
           {list.map((c) => (
             <button key={c.id} className="person" type="button" onClick={() => nav.go("customer", { customerId: c.id })}>
-              <Photo id={c.id} name={c.name} size={46} gender={c.gender} />
+              <span className="cust-no">{custNo(c.id)}</span>
               <span className="who">
-                <span className="name-row">
-                  <b>{c.name}</b>
-                  <span className="tag">{custType(c)}</span>
-                </span>
-                <p className="sub">
-                  {c.phone} · {c.lastPurchaseAt ? formatDot(c.lastPurchaseAt) : "미구매"}
-                </p>
+                <b>{c.name}</b>
               </span>
-              <span className="due-pill">{segmentLabel[c.segments[0]]}</span>
+              <span className="cust-type">{chipMeta(c, seg)}</span>
             </button>
           ))}
         </div>
@@ -114,11 +149,10 @@ export function CustomersScreen() {
 
 export function CustomerScreen() {
   const nav = useNav();
-  const { notesOf } = useConsults();
-  const c = customers.find((x) => x.id === nav.customerId) ?? customers[0];
+  const { notesOf, list } = useConsults();
+  const c = list.find((x) => x.id === nav.customerId) ?? list[0];
   const notes = [...notesOf(c.id)].sort((a, b) => noteTime(b.date).localeCompare(noteTime(a.date)));
-  const [tab, setTab] = useState<"profile" | "buy" | "consult" | "skin" | "point">("profile");
-  const no = Number(c.id.replace(/\D/g, "")) || 1;
+  const [tab, setTab] = useState<"profile" | "buy" | "consult" | "point">("profile");
   const birthMd = c.birth.slice(5).replace("-", "/");
   const lastSale = [...c.ledger]
     .filter((r) => r.type === "sale")
@@ -126,15 +160,7 @@ export function CustomerScreen() {
     .at(-1);
   const plcc = c.segments.includes("vip") || c.purchaseCount >= 10;
   const nick = c.family && !["미혼", "없음"].includes(c.family) ? c.family.split(",")[0] : null;
-  const brands = [c.favoriteBrand].filter(Boolean);
-  const concerns = c.skin.split(/[·,]/).map((s) => s.trim()).filter(Boolean);
   const joinPath = c.timeline.find((t) => t.kind === "join")?.detail ?? "방문판매";
-  const scores = [
-    { label: "수분", value: scoreFrom(c.id, 3) },
-    { label: "유분", value: scoreFrom(c.id, 11, 22, 52) },
-    { label: "탄력", value: scoreFrom(c.id, 19, 30, 50) },
-    { label: "색소", value: scoreFrom(c.id, 29, 18, 46) },
-  ];
   const point = counselPoint(c, lastSale?.product, lastSale?.date, notes[0]);
 
   return (
@@ -143,21 +169,14 @@ export function CustomerScreen() {
         title="목록"
         onBack={nav.back}
         right={
-          <div className="cd-top-right">
-            <button className="icon-btn" type="button" onClick={() => nav.go("push")} aria-label="알림">
-              <IconBell width={18} height={18} />
-            </button>
-            <button className="cd-ai-btn" type="button" onClick={() => nav.go("chat")}>
-              <IconSparkle width={12} height={12} />
-              스마트카운셀링AI
-            </button>
-          </div>
+          <button className="icon-btn" type="button" onClick={() => nav.go("push")} aria-label="알림">
+            <IconBell width={18} height={18} />
+          </button>
         }
       />
 
       <div className="cd-hero">
         <div className="cd-id">
-          <Photo id={c.id} name={c.name} size={56} gender={c.gender} />
           <div>
             <div className="cd-name">
               <b>{c.name}</b>
@@ -167,7 +186,7 @@ export function CustomerScreen() {
               </span>
             </div>
             <p>
-              고객번호 {no}번 · {c.age}세 · {tendencyLabel[c.tendency]}
+              {c.age}세 · {custType(c)}
             </p>
             <div className="cd-flags">
               <span className={`badge ${c.purchaseProb === "high" ? "green" : c.purchaseProb === "medium" ? "amber" : "gray"}`}>
@@ -187,6 +206,16 @@ export function CustomerScreen() {
               <IconChat width={18} height={18} />
             </button>
           </div>
+        </div>
+        <div className="cd-metrics">
+          <button className="cd-points" type="button" onClick={() => setTab("point")}>
+            <span>뷰티포인트</span>
+            <b>{c.beautyPoints.toLocaleString("ko-KR")}P</b>
+          </button>
+          <button className="cd-points" type="button" onClick={() => setTab("buy")}>
+            <span>미수금액</span>
+            <b className={c.unpaid ? "bad" : ""}>{c.unpaid ? krw(c.unpaid) : "없음"}</b>
+          </button>
         </div>
         <div className="cd-acts">
           <button type="button" onClick={() => nav.go("sales", { customerId: c.id })}>
@@ -215,7 +244,6 @@ export function CustomerScreen() {
             ["profile", "프로필"],
             ["buy", "구매이력"],
             ["consult", "상담이력"],
-            ["skin", "피부진단"],
             ["point", "뷰티포인트"],
           ] as const
         ).map(([id, label]) => (
@@ -253,41 +281,7 @@ export function CustomerScreen() {
                 </span>
                 <b>{c.joinedAt}</b>
               </div>
-              <div>
-                <span>
-                  <IconStar width={14} height={14} /> 선호 브랜드
-                </span>
-                <div className="chips">
-                  {brands.map((b) => (
-                    <span className="chip on" key={b} style={{ pointerEvents: "none" }}>
-                      {b}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <span>
-                  <IconSparkle width={14} height={14} /> 피부고민
-                </span>
-                <div className="chips">
-                  {concerns.map((b) => (
-                    <span className="chip" key={b} style={{ pointerEvents: "none" }}>
-                      {b}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
-          </div>
-
-          <div className="cd-card">
-            <div className="cd-sec-h">
-              <div className="cd-sec-title">
-                <i>성향분석</i>
-                <h4>{tendencyLabel[c.tendency]}</h4>
-              </div>
-            </div>
-            <p className="cd-copy">{point.tendency}</p>
           </div>
 
           <div className="cd-card">
@@ -375,30 +369,6 @@ export function CustomerScreen() {
         </div>
       ) : null}
 
-      {tab === "skin" ? (
-        <div className="cd-body">
-          <div className="cd-card">
-            <p className="cd-recent">최근 진단 {c.lastDiagnosis ?? formatDot(c.lastConsultAt)}</p>
-            <p style={{ fontSize: 13, margin: "0 0 12px" }}>{c.skinDiagnosis}</p>
-            {scores.map((s) => (
-              <div className="dx-row" key={s.label}>
-                <div className="lab">
-                  <span>{s.label}</span>
-                  <span>{s.value}</span>
-                </div>
-                <div className="dx-bar">
-                  <i style={{ width: `${s.value}%` }} />
-                </div>
-              </div>
-            ))}
-            <button className="btn primary" style={{ marginTop: 16 }} type="button" onClick={() => nav.go("skindiag", { customerId: c.id })}>
-              <IconScan width={16} height={16} />
-              AI 피부진단 링크발송
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       {tab === "point" ? (
         <div className="cd-body">
           <div className="cd-card">
@@ -474,7 +444,8 @@ function scoreFrom(id: string, salt: number, min = 28, span = 48) {
 
 export function SkinDiagScreen() {
   const nav = useNav();
-  const c = customers.find((x) => x.id === nav.customerId) ?? customers[0];
+  const { list } = useConsults();
+  const c = list.find((x) => x.id === nav.customerId) ?? list[0];
   const scores = [
     { label: "수분", value: scoreFrom(c.id, 3) },
     { label: "유분", value: scoreFrom(c.id, 11, 22, 52) },
@@ -486,7 +457,6 @@ export function SkinDiagScreen() {
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
       <TopBar title="AI 피부진단 링크발송" onBack={nav.back} />
       <div className="dx-hero">
-        <Photo id={c.id} name={c.name} size={84} gender={c.gender} />
         <h3>{c.name}</h3>
         <p>
           최근 진단 {c.lastDiagnosis ?? formatDot(c.lastConsultAt)}
@@ -596,7 +566,7 @@ export function GuestSkinScreen() {
             className="btn outline"
             style={{ marginTop: 8 }}
             type="button"
-            onClick={() => nav.go("customers")}
+            onClick={() => nav.go("register", { name, phone })}
           >
             고객으로 등록
           </button>
@@ -610,7 +580,7 @@ const TOPICS = ["피부상담", "재구매 상담", "방문상담", "클레임",
 
 export function NoteScreen() {
   const nav = useNav();
-  const { addNote } = useConsults();
+  const { addNote, list: customers } = useConsults();
   const [q, setQ] = useState("");
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [topic, setTopic] = useState(TOPICS[0]);
@@ -645,7 +615,6 @@ export function NoteScreen() {
             <div className="card list-card">
               {list.map((c) => (
                 <button key={c.id} className="person" type="button" onClick={() => setPickedId(c.id)}>
-                  <Photo id={c.id} name={c.name} size={46} gender={c.gender} />
                   <span className="who">
                     <span className="name-row">
                       <b>{c.name}</b>
@@ -661,7 +630,6 @@ export function NoteScreen() {
       ) : (
         <div className="pad">
           <div className="picked-bar">
-            <Photo id={picked.id} name={picked.name} size={44} gender={picked.gender} />
             <div>
               <b>{picked.name}</b>
               <p>{picked.phone}</p>

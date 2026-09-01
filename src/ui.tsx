@@ -3,42 +3,6 @@ import { IconBell, IconChevron } from "./icons";
 import { useNav } from "./nav";
 import type { Level } from "./types";
 
-const PHOTO_ALIAS: Record<string, string> = {
-  m1: "me",
-  m2: "c2",
-  m3: "c4",
-  m4: "c8",
-  m5: "c5",
-};
-
-export function photoUrl(id: string, _gender?: "f" | "m") {
-  const key = PHOTO_ALIAS[id] ?? id;
-  return `/photos/${key}.png`;
-}
-
-export function Photo({
-  id,
-  name,
-  size = 44,
-  gender,
-}: {
-  id: string;
-  name: string;
-  size?: number;
-  gender?: "f" | "m";
-}) {
-  return (
-    <img
-      className="photo"
-      src={photoUrl(id, gender)}
-      alt={name}
-      width={size}
-      height={size}
-      style={{ width: size, height: size }}
-    />
-  );
-}
-
 export function AppHeader() {
   const nav = useNav();
   return (
@@ -108,26 +72,19 @@ export function riskTone(v: Level): "red" | "amber" | "green" {
   return "green";
 }
 
-export function Avatar({ name }: { name: string }) {
-  return <div className="avatar">{name.slice(0, 1)}</div>;
-}
-
 export function PersonRow({
   name,
   meta,
   right,
   onClick,
-  id,
 }: {
   name: string;
   meta: string;
   right?: ReactNode;
   onClick?: () => void;
-  id?: string;
 }) {
   return (
     <button type="button" className="row" onClick={onClick}>
-      {id ? <Photo id={id} name={name} size={40} /> : <Avatar name={name} />}
       <div className="meta">
         <b>{name}</b>
         <p>{meta}</p>
