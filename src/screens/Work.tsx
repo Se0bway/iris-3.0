@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { counselor, products, promos } from "../data";
-import { krw } from "../lib";
+import { custNo, krw } from "../lib";
 import { useNav } from "../nav";
 import { useConsults } from "../consult";
-import { IconBox, IconChevron, IconSearch } from "../icons";
+import { IconBack, IconBox, IconChevron, IconDown, IconSearch } from "../icons";
 import { AppHeader, TopBar } from "../ui";
+import type { Customer, LedgerRow } from "../types";
 
 const stockQty = products.reduce((s, p) => s + p.stock, 0);
 const stockAmt = products.reduce((s, p) => s + p.stock * p.price, 0);
@@ -104,7 +105,41 @@ export function TradeScreen() {
 }
 
 export function SlipsScreen() {
-  return <TradeFlow kind="slips" title="전표조회" />;
+  const nav = useNav();
+  const [kind, setKind] = useState<"slips" | "cancelled" | null>(null);
+
+  if (!kind) {
+    return (
+      <div className="app-scroll">
+        <TopBar title="전표조회" onBack={nav.back} />
+        <div className="pad">
+          <div className="card list-card">
+            {[
+              { id: "slips" as const, n: "1", title: "전표조회", desc: "판매 · 수금 전표" },
+              { id: "cancelled" as const, n: "2", title: "취소전표 조회", desc: "취소된 판매 · 수금 전표" },
+            ].map((it) => (
+              <button key={it.id} className="row" type="button" onClick={() => setKind(it.id)}>
+                <div className="avatar">{it.n}</div>
+                <div className="meta">
+                  <b>{it.title}</b>
+                  <p>{it.desc}</p>
+                </div>
+                <IconChevron />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <TradeFlow
+      kind={kind}
+      title={kind === "cancelled" ? "취소전표 조회" : "전표조회"}
+      onExit={() => setKind(null)}
+    />
+  );
 }
 
 export function SalesScreen() {
@@ -115,17 +150,27 @@ export function CollectionScreen() {
   return <TradeFlow kind="collection" title="수금" />;
 }
 
-function TradeFlow({ kind, title }: { kind: "slips" | "sales" | "collection"; title: string }) {
+function TradeFlow({
+  kind,
+  title,
+  onExit,
+}: {
+  kind: "slips" | "cancelled" | "sales" | "collection";
+  title: string;
+  onExit?: () => void;
+}) {
   const nav = useNav();
   const fromCrm = nav.stack[nav.stack.length - 1] === "customer";
   const [pickedId, setPickedId] = useState<string | null>(() => (fromCrm ? nav.customerId : null));
+  const leave = onExit ?? nav.back;
 
   if (!pickedId) {
-    return <CustomerPick title={title} onPick={setPickedId} onBack={nav.back} />;
+    return <CustomerPick title={title} onPick={setPickedId} onBack={leave} />;
   }
 
-  const onBack = fromCrm ? nav.back : () => setPickedId(null);
-  if (kind === "slips") return <SlipsPage customerId={pickedId} onBack={onBack} />;
+  const onBack = fromCrm ? leave : () => setPickedId(null);
+  if (kind === "slips") return <SlipsPage customerId={pickedId} onBack={onBack} cancelledOnly={false} />;
+  if (kind === "cancelled") return <SlipsPage customerId={pickedId} onBack={onBack} cancelledOnly />;
   if (kind === "sales") return <SalesPage customerId={pickedId} onBack={onBack} />;
   return <CollectPage customerId={pickedId} onBack={onBack} />;
 }
@@ -192,30 +237,200 @@ function UnpaidBar({ customerId }: { customerId: string }) {
   );
 }
 
-function SlipsPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+function slipLines(r: LedgerRow) {
+  if (r.lines?.length) return r.lines;
+  const hit = products.find((p) => r.product && (r.product.includes(p.name) || r.product.includes(p.brand)));
+  return [
+    {
+      code: hit?.code ?? "—",
+      name: r.product ?? (r.type === "sale" ? "판매" : "수금"),
+      qty: 1,
+      amount: r.amount,
+    },
+  ];
+}
+
+function slipIssuedAt(r: LedgerRow) {
+  return r.issuedAt ?? `${r.date} 10:00:00`;
+}
+
+function SlipsPage({
+  customerId,
+  onBack,
+  cancelledOnly,
+}: {
+  customerId: string;
+  onBack: () => void;
+  cancelledOnly: boolean;
+}) {
   const c = useCustomer(customerId);
+  const [slipId, setSlipId] = useState<string | null>(null);
+  const rows = c.ledger.filter((r) => (cancelledOnly ? r.status === "취소" : r.status !== "취소"));
+  const slip = rows.find((r) => r.id === slipId) ?? null;
+
+  if (slip) {
+    return <SlipDetail customer={c} row={slip} onBack={() => setSlipId(null)} />;
+  }
+
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
       <TopBar title={c.name} onBack={onBack} />
       <UnpaidBar customerId={c.id} />
       <div className="tr-card">
-        <h4>전표</h4>
-        {c.ledger.length === 0 ? (
-          <p className="tr-hint">최근 전표가 없습니다.</p>
+        <h4>{cancelledOnly ? "취소전표" : "전표"}</h4>
+        {rows.length === 0 ? (
+          <p className="tr-hint">{cancelledOnly ? "취소된 전표가 없습니다." : "최근 전표가 없습니다."}</p>
         ) : (
-          c.ledger.map((r) => (
-            <div className="tr-prod" key={r.id}>
+          rows.map((r) => (
+            <button className="tr-prod" key={r.id} type="button" onClick={() => setSlipId(r.id)}>
               <div>
-                <b>{r.type === "sale" ? "판매" : "수금"}{r.product ? ` · ${r.product}` : ""}</b>
+                <b>
+                  {r.type === "sale" ? "판매" : "수금"}
+                  {r.product ? ` · ${r.product}` : ""}
+                </b>
                 <span>
                   {r.date} · {r.status}
                 </span>
               </div>
               <em className="tr-amt">{krw(r.amount)}</em>
-            </div>
+            </button>
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function SlipDetail({
+  customer,
+  row,
+  onBack,
+}: {
+  customer: Customer;
+  row: LedgerRow;
+  onBack: () => void;
+}) {
+  const { cancelSlip } = useConsults();
+  const [open, setOpen] = useState(true);
+  const [ask, setAsk] = useState(false);
+  const sale = row.type === "sale";
+  const cancelled = row.status === "취소";
+  const lines = slipLines(row);
+  const qty = lines.reduce((s, l) => s + l.qty, 0);
+  const coupon = row.coupon ?? 0;
+  const earn = row.pointsEarn ?? 0;
+  const used = row.pointsUse ?? 0;
+
+  return (
+    <div className="slip-page">
+      <header className="slip-head">
+        <button type="button" onClick={onBack}>
+          <IconBack width={20} height={20} />
+          뒤로
+        </button>
+        <h2>전표 상세조회</h2>
+        <span />
+      </header>
+      <div className="slip-scroll">
+        <table className="slip-table">
+          <tbody>
+            <tr>
+              <th>고객 정보</th>
+              <td>
+                {custNo(customer.id)} {customer.name}
+              </td>
+            </tr>
+            <tr>
+              <th>전표구분</th>
+              <td>{sale ? "판매 전표" : "수금 전표"}</td>
+            </tr>
+            <tr>
+              <th>전표 발행일</th>
+              <td>{slipIssuedAt(row)}</td>
+            </tr>
+            <tr>
+              <th>{sale ? "판매 정보" : "수금 정보"}</th>
+              <td>
+                {sale ? (
+                  <>
+                    <div>수량 : {qty} 개</div>
+                    <div>금액 : {krw(row.amount)}</div>
+                  </>
+                ) : (
+                  <div>금액 : {krw(row.amount)}</div>
+                )}
+              </td>
+            </tr>
+            <tr>
+              <th>쿠폰 할인</th>
+              <td>{krw(coupon)}</td>
+            </tr>
+            <tr>
+              <th>적립/사용 뷰티포인트</th>
+              <td>
+                <div>적립 : {earn.toLocaleString("ko-KR")} P</div>
+                <div>사용 : {used.toLocaleString("ko-KR")} P</div>
+              </td>
+            </tr>
+            <tr>
+              <th>현재미수</th>
+              <td>{customer.unpaid ? krw(customer.unpaid) : "0원"}</td>
+            </tr>
+            <tr>
+              <th>현재 뷰티포인트</th>
+              <td>{customer.beautyPoints.toLocaleString("ko-KR")}P</td>
+            </tr>
+          </tbody>
+        </table>
+        <button className="slip-acc-h" type="button" onClick={() => setOpen((v) => !v)}>
+          <span>{sale ? "판매 상세" : "수금 상세"}</span>
+          <i className={open ? "open" : ""}>
+            <IconDown width={16} height={16} />
+          </i>
+        </button>
+        {open
+          ? lines.map((l) => (
+              <div className="slip-item" key={`${l.code}-${l.name}`}>
+                <b>{l.code}</b>
+                <p>{l.name}</p>
+                <em>
+                  {sale ? "판매수량" : "수량"} : {l.qty}개 | {sale ? "판매금액" : "금액"} : {krw(l.amount)}
+                </em>
+              </div>
+            ))
+          : null}
+      </div>
+      <div className="slip-foot">
+        <button className="btn outline" type="button" onClick={onBack}>
+          확인
+        </button>
+        <button className="btn primary" type="button" disabled={cancelled} onClick={() => setAsk(true)}>
+          전표취소
+        </button>
+      </div>
+      {ask ? (
+        <div className="slip-mask">
+          <div className="slip-dialog">
+            <p>이 전표를 취소할까요?</p>
+            <div className="slip-dialog-btns">
+              <button className="btn outline" type="button" onClick={() => setAsk(false)}>
+                아니오
+              </button>
+              <button
+                className="btn primary"
+                type="button"
+                onClick={() => {
+                  cancelSlip(customer.id, row.id);
+                  setAsk(false);
+                  onBack();
+                }}
+              >
+                전표취소
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

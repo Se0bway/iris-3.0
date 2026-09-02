@@ -90,6 +90,13 @@ export interface ConsultNote {
   body: string;
 }
 
+export interface LedgerLine {
+  code: string;
+  name: string;
+  qty: number;
+  amount: number;
+}
+
 export interface LedgerRow {
   id: string;
   date: string;
@@ -97,6 +104,11 @@ export interface LedgerRow {
   product?: string;
   amount: number;
   status: string;
+  issuedAt?: string;
+  coupon?: number;
+  pointsEarn?: number;
+  pointsUse?: number;
+  lines?: LedgerLine[];
 }
 
 export interface PointRow {
@@ -105,6 +117,14 @@ export interface PointRow {
   type: "earn" | "use";
   label: string;
   amount: number;
+}
+
+export interface PointExpireLine {
+  id: string;
+  expireAt: string;
+  amount: number;
+  kind: string;
+  note: string;
 }
 
 export interface Customer {
@@ -140,6 +160,8 @@ export interface Customer {
   health: string;
   anniversaries: Anniversary[];
   beautyPoints: number;
+  pointsExpireAt?: string;
+  pointExpires?: PointExpireLine[];
   pointHistory: PointRow[];
   skinDiagnosis: string;
   timeline: TimelineEvent[];

@@ -1,47 +1,145 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { TODAY } from "../data";
 import { useConsults } from "../consult";
 import { custNo, custType, formatDot, krw, levelLabel, statusLabel } from "../lib";
 import { useNav } from "../nav";
-import type { Customer, MessageType } from "../types";
+import { IconBell, IconCake, IconCalendar, IconChat, IconChevron, IconHome, IconPhone, IconScan, IconSearch } from "../icons";
+import type { Customer, MessageType, PointExpireLine } from "../types";
 import { AppHeader, TopBar } from "../ui";
-import {
-  IconBell,
-  IconCake,
-  IconCalendar,
-  IconChat,
-  IconHome,
-  IconPhone,
-  IconScan,
-  IconSearch,
-} from "../icons";
 
 export { RegisterScreen } from "./Register";
 
-const filters = [
-  { id: "all", label: "전체" },
-  { id: "new", label: "신규" },
-  { id: "vip", label: "VIP" },
+const sorts = [
+  { id: "buy", label: "구매 금액" },
+  { id: "unpaid", label: "미수" },
+  { id: "new", label: "등록일" },
   { id: "birthday", label: "생일" },
-  { id: "points", label: "뷰티포인트 소멸 예정" },
+  { id: "points", label: "포인트 소멸" },
 ] as const;
 
-type FilterId = (typeof filters)[number]["id"];
+type FilterId = (typeof sorts)[number]["id"];
+type MoneySpan = "cur" | "prev" | "m3" | "m6";
+type MonthSpan = 0 | 1 | 2;
 
-const yearAgo = (() => {
-  const [y, m, d] = TODAY.split("-").map(Number);
-  return `${y - 1}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-})();
+const MONEY_OPTS = [
+  ["cur", "당월"],
+  ["prev", "전월"],
+  ["m3", "최근 3개월"],
+  ["m6", "최근 6개월"],
+] as const;
 
-function yearSales(c: Customer) {
-  const sum = c.ledger.filter((r) => r.type === "sale" && r.date >= yearAgo).reduce((s, r) => s + r.amount, 0);
-  return sum || c.totalAmount;
+const todayY = Number(TODAY.slice(0, 4));
+const todayM = Number(TODAY.slice(5, 7));
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
 }
 
-function bdayKey(c: Customer) {
-  const md = c.birth.slice(5);
-  const today = TODAY.slice(5);
-  return md >= today ? `0-${md}` : `1-${md}`;
+function addMonths(y: number, m: number, delta: number) {
+  const t = y * 12 + (m - 1) + delta;
+  return { y: Math.floor(t / 12), m: (t % 12) + 1 };
+}
+
+function ymKey(y: number, m: number) {
+  return `${y}-${pad2(m)}`;
+}
+
+function addDaysIso(iso: string, delta: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + delta);
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
+
+function liveSale(r: { type: string; status: string; date: string; amount: number }) {
+  return r.type === "sale" && r.status !== "취소";
+}
+
+function salesBetween(c: Customer, start: string, end: string) {
+  return c.ledger.filter((r) => liveSale(r) && r.date >= start && r.date <= end).reduce((s, r) => s + r.amount, 0);
+}
+
+function monthRange() {
+  return { start: `${ymKey(todayY, todayM)}-01`, end: `${ymKey(todayY, todayM)}-31` };
+}
+
+function moneyRange(span: MoneySpan) {
+  if (span === "cur") return monthRange();
+  if (span === "prev") {
+    const p = addMonths(todayY, todayM, -1);
+    return { start: `${ymKey(p.y, p.m)}-01`, end: `${ymKey(p.y, p.m)}-31` };
+  }
+  const back = addMonths(todayY, todayM, span === "m3" ? -2 : -5);
+  return { start: `${ymKey(back.y, back.m)}-01`, end: TODAY };
+}
+
+function moneyLabel(span: MoneySpan) {
+  return MONEY_OPTS.find((o) => o[0] === span)?.[1] ?? "";
+}
+
+function buySales(c: Customer, span: MoneySpan) {
+  const { start, end } = moneyRange(span);
+  return salesBetween(c, start, end);
+}
+
+function remainingUnpaid(c: Customer, sale: Customer["ledger"][number]) {
+  if (sale.status === "미수") return sale.amount;
+  const collected = c.ledger.filter((r) => r.type === "collect" && r.date >= sale.date).reduce((s, r) => s + r.amount, 0);
+  return Math.max(0, sale.amount - collected);
+}
+
+function unpaidRows(c: Customer, start: string, end: string) {
+  return c.ledger.filter(
+    (r) => liveSale(r) && r.status !== "수금완료" && r.date >= start && r.date <= end && remainingUnpaid(c, r) > 0
+  );
+}
+
+function unpaidInRange(c: Customer, span: MoneySpan) {
+  const { start, end } = moneyRange(span);
+  return unpaidRows(c, start, end).reduce((s, r) => s + remainingUnpaid(c, r), 0);
+}
+
+function shiftYm(span: MonthSpan) {
+  const t = addMonths(todayY, todayM, span);
+  return ymKey(t.y, t.m);
+}
+
+function birthMonthOf(c: Customer) {
+  return Number(c.birth.slice(5, 7));
+}
+
+function expireLinesOf(c: Customer): PointExpireLine[] {
+  if (c.pointExpires?.length) return c.pointExpires;
+  if (!c.pointsExpireAt) return [];
+  return [
+    {
+      id: `${c.id}-ex`,
+      expireAt: c.pointsExpireAt,
+      amount: c.beautyPoints,
+      kind: "구매적립",
+      note: "소멸 예정 포인트",
+    },
+  ];
+}
+
+function expireLinesInMonth(c: Customer, ym: string) {
+  return expireLinesOf(c)
+    .filter((l) => l.expireAt.startsWith(ym))
+    .sort((a, b) => a.expireAt.localeCompare(b.expireAt) || b.amount - a.amount);
+}
+
+function expireSumInMonth(c: Customer, ym: string) {
+  return expireLinesInMonth(c, ym).reduce((s, l) => s + l.amount, 0);
+}
+
+function salesRows(c: Customer, start: string, end: string) {
+  return c.ledger.filter((r) => liveSale(r) && r.date >= start && r.date <= end);
+}
+
+function shortType(c: Customer) {
+  const t = custType(c);
+  if (t.startsWith("통합")) return "통합";
+  if (t.startsWith("닉네임")) return "닉네임";
+  return "일반";
 }
 
 function bdayLabel(c: Customer) {
@@ -49,37 +147,297 @@ function bdayLabel(c: Customer) {
   return `${Number(m)}/${Number(d)}`;
 }
 
+function expireLabel(iso?: string) {
+  if (!iso) return "";
+  return `${Number(iso.slice(5, 7))}월 소멸`;
+}
+
 function chipHead(seg: FilterId) {
-  if (seg === "new") return "등록일자";
-  if (seg === "vip") return "1년간 누적 구매 금액";
+  if (seg === "buy") return "구매 금액";
+  if (seg === "unpaid") return "미수";
+  if (seg === "new") return "등록일";
   if (seg === "birthday") return "생일";
   if (seg === "points") return "소멸예정";
-  return "고객유형";
+  return "";
 }
 
-function chipMeta(c: Customer, seg: FilterId) {
+function chipMeta(c: Customer, seg: FilterId, moneySpan: MoneySpan, ym: string) {
+  if (seg === "buy") return krw(buySales(c, moneySpan));
+  if (seg === "unpaid") {
+    const v = unpaidInRange(c, moneySpan);
+    return v ? krw(v) : "없음";
+  }
   if (seg === "new") return formatDot(c.joinedAt);
-  if (seg === "vip") return krw(yearSales(c));
   if (seg === "birthday") return bdayLabel(c);
-  if (seg === "points") return `${c.beautyPoints.toLocaleString("ko-KR")}P`;
-  return custType(c);
+  if (seg === "points") {
+    const first = expireLinesInMonth(c, ym)[0];
+    return (
+      <>
+        <em>{expireSumInMonth(c, ym).toLocaleString("ko-KR")}P</em>
+        <em>{expireLabel(first?.expireAt)}</em>
+      </>
+    );
+  }
+  return null;
 }
 
-function chipSort(a: Customer, b: Customer, seg: FilterId) {
+function chipSort(a: Customer, b: Customer, seg: FilterId, moneySpan: MoneySpan, ym: string) {
   if (seg === "new") return b.joinedAt.localeCompare(a.joinedAt);
-  if (seg === "vip") return yearSales(b) - yearSales(a);
-  if (seg === "birthday") return bdayKey(a).localeCompare(bdayKey(b));
-  if (seg === "points") return b.beautyPoints - a.beautyPoints;
+  if (seg === "buy") return buySales(b, moneySpan) - buySales(a, moneySpan) || custNo(a.id) - custNo(b.id);
+  if (seg === "unpaid") return unpaidInRange(b, moneySpan) - unpaidInRange(a, moneySpan) || custNo(a.id) - custNo(b.id);
+  if (seg === "birthday") return a.birth.slice(5).localeCompare(b.birth.slice(5));
+  if (seg === "points") {
+    const da = expireLinesInMonth(a, ym)[0]?.expireAt ?? "";
+    const db = expireLinesInMonth(b, ym)[0]?.expireAt ?? "";
+    return da.localeCompare(db) || expireSumInMonth(b, ym) - expireSumInMonth(a, ym);
+  }
   return custNo(a.id) - custNo(b.id);
+}
+
+function metricTitle(seg: FilterId) {
+  if (seg === "buy") return "구매 금액";
+  if (seg === "unpaid") return "미수";
+  if (seg === "new") return "등록일";
+  if (seg === "birthday") return "생일";
+  if (seg === "points") return "포인트 소멸";
+  return "내역";
+}
+
+function joinMinOf(customers: Customer[]) {
+  return customers.length ? customers.reduce((m, c) => (c.joinedAt < m ? c.joinedAt : m), TODAY) : TODAY;
+}
+
+function StepperRow({
+  label,
+  value,
+  onMinus,
+  onPlus,
+  minusOff,
+  plusOff,
+}: {
+  label: string;
+  value: string;
+  onMinus: () => void;
+  onPlus: () => void;
+  minusOff?: boolean;
+  plusOff?: boolean;
+}) {
+  return (
+    <div className="range-row">
+      <span>{label}</span>
+      <div className="range-step">
+        <button type="button" onClick={onMinus} disabled={minusOff} aria-label={`${label} 줄이기`}>
+          −
+        </button>
+        <b>{value}</b>
+        <button type="button" onClick={onPlus} disabled={plusOff} aria-label={`${label} 늘리기`}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PeriodPicks<T extends string | number>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: readonly (readonly [T, string])[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="period-btns">
+      {options.map(([id, label]) => (
+        <button key={String(id)} className={`period-btn ${value === id ? "on" : ""}`} type="button" onClick={() => onChange(id)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RangeCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="range-card">
+      <span className="range-k">조회조건</span>
+      {children}
+    </div>
+  );
+}
+
+function InfoCard({ rows }: { rows: [string, string][] }) {
+  return (
+    <div className="ex-card">
+      {rows.map(([k, v]) => (
+        <div className="ex-kv" key={k}>
+          <span>{k}</span>
+          <b>{v}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChipMetricScreen({
+  customer: c,
+  seg,
+  moneySpan,
+  ym,
+  onBack,
+}: {
+  customer: Customer;
+  seg: FilterId;
+  moneySpan: MoneySpan;
+  ym: string;
+  onBack: () => void;
+}) {
+  const range = moneyRange(moneySpan);
+  const sales = salesRows(c, range.start, range.end);
+  const unpaid = unpaidRows(c, range.start, range.end);
+  const expires = expireLinesInMonth(c, ym);
+  const period = moneyLabel(moneySpan);
+
+  return (
+    <div className="app-scroll" style={{ background: "var(--bg)" }}>
+      <TopBar title={metricTitle(seg)} onBack={onBack} />
+      <div className="pad">
+        <div className="ex-who">
+          <span className="cust-no">{custNo(c.id)}</span>
+          <b>{c.name}</b>
+          <i className="cust-kind">{shortType(c)}</i>
+        </div>
+        {seg === "points" ? (
+          <>
+            <p className="ex-sum">
+              {Number(ym.slice(5, 7))}월 소멸 {expireSumInMonth(c, ym).toLocaleString("ko-KR")}P
+            </p>
+            {expires.length === 0 ? (
+              <p className="empty">해당 월 소멸 내역이 없습니다.</p>
+            ) : (
+              expires.map((l) => (
+                <div className="ex-card" key={l.id}>
+                  <div className="ex-kv">
+                    <span>소멸 예정일</span>
+                    <b>{formatDot(l.expireAt)}</b>
+                  </div>
+                  <div className="ex-amt">{l.amount.toLocaleString("ko-KR")}P</div>
+                  <div className="ex-kv">
+                    <span>구분</span>
+                    <b>{l.kind}</b>
+                  </div>
+                  <div className="ex-kv">
+                    <span>내용</span>
+                    <b>{l.note}</b>
+                  </div>
+                </div>
+              ))
+            )}
+          </>
+        ) : null}
+        {seg === "buy" ? (
+          <>
+            <InfoCard rows={[[`${period} 구매`, krw(buySales(c, moneySpan))]]} />
+            {sales.length === 0 ? (
+              <p className="empty">해당 기간 판매 내역이 없습니다.</p>
+            ) : (
+              sales.map((r) => (
+                <div className="ex-card" key={r.id}>
+                  <div className="ex-kv">
+                    <span>일자</span>
+                    <b>{formatDot(r.date)}</b>
+                  </div>
+                  <div className="ex-amt">{krw(r.amount)}</div>
+                  <div className="ex-kv">
+                    <span>구분</span>
+                    <b>판매</b>
+                  </div>
+                  <div className="ex-kv">
+                    <span>내용</span>
+                    <b>{r.product ?? r.status}</b>
+                  </div>
+                </div>
+              ))
+            )}
+          </>
+        ) : null}
+        {seg === "unpaid" ? (
+          <>
+            <InfoCard rows={[[`${period} 미수`, unpaidInRange(c, moneySpan) ? krw(unpaidInRange(c, moneySpan)) : "없음"]]} />
+            {unpaid.length === 0 ? (
+              <p className="empty">해당 기간 미수 내역이 없습니다.</p>
+            ) : (
+              unpaid.map((r) => (
+                <div className="ex-card" key={r.id}>
+                  <div className="ex-kv">
+                    <span>일자</span>
+                    <b>{formatDot(r.date)}</b>
+                  </div>
+                  <div className="ex-amt">{krw(remainingUnpaid(c, r))}</div>
+                  <div className="ex-kv">
+                    <span>구분</span>
+                    <b>{r.status}</b>
+                  </div>
+                  <div className="ex-kv">
+                    <span>내용</span>
+                    <b>{r.product ?? ""}</b>
+                  </div>
+                </div>
+              ))
+            )}
+          </>
+        ) : null}
+        {seg === "new" ? <InfoCard rows={[["등록일", formatDot(c.joinedAt)]]} /> : null}
+        {seg === "birthday" ? (
+          <InfoCard
+            rows={[
+              ["생일", formatDot(c.birth)],
+              ["나이", `${c.age}세`],
+            ]}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function CustomersScreen() {
   const nav = useNav();
   const { list: customers } = useConsults();
   const [q, setQ] = useState("");
-  const [seg, setSeg] = useState<FilterId>("all");
+  const [seg, setSeg] = useState<FilterId>("buy");
+  const [moneySpan, setMoneySpan] = useState<MoneySpan>("cur");
+  const [monthSpan, setMonthSpan] = useState<MonthSpan>(0);
+  const [custom, setCustom] = useState<{ dateStart: string; dateEnd: string } | null>(null);
+  const [metricId, setMetricId] = useState<string | null>(null);
+
+  const ym = shiftYm(monthSpan);
+  const joinMin = joinMinOf(customers);
+  const dateStart = custom?.dateStart ?? joinMin;
+  const dateEnd = custom?.dateEnd ?? TODAY;
+
+  const bumpDate = (which: "start" | "end", delta: number) => {
+    const floor = joinMin;
+    const capEnd = TODAY;
+    let s = dateStart;
+    let e = dateEnd;
+    if (which === "start") {
+      s = addDaysIso(s, delta);
+      if (s < floor) s = floor;
+      if (s > capEnd) s = capEnd;
+      if (s > e) e = s;
+    } else {
+      e = addDaysIso(e, delta);
+      if (e > capEnd) e = capEnd;
+      if (e < floor) e = floor;
+      if (e < s) s = e;
+    }
+    setCustom({ dateStart: s, dateEnd: e });
+  };
 
   const list = useMemo(() => {
+    const bdayM = Number(ym.slice(5, 7));
     return customers
       .filter((c) => {
         const hit =
@@ -87,13 +445,34 @@ export function CustomersScreen() {
           c.name.includes(q) ||
           c.phone.replace(/-/g, "").includes(q.replace(/-/g, "")) ||
           String(custNo(c.id)).includes(q.replace(/\D/g, "") || q);
-        const s =
-          seg === "all" ||
-          (seg === "points" ? c.beautyPoints > 0 : c.segments.includes(seg));
-        return hit && s;
+        if (!hit) return false;
+        if (seg === "new") return c.joinedAt >= dateStart && c.joinedAt <= dateEnd;
+        if (seg === "birthday") return birthMonthOf(c) === bdayM;
+        if (seg === "points") return expireLinesInMonth(c, ym).length > 0;
+        return true;
       })
-      .sort((a, b) => chipSort(a, b, seg));
-  }, [q, seg, customers]);
+      .sort((a, b) => chipSort(a, b, seg, moneySpan, ym));
+  }, [q, seg, customers, moneySpan, dateStart, dateEnd, ym]);
+
+  const metricCustomer = metricId ? (customers.find((c) => c.id === metricId) ?? null) : null;
+  if (metricCustomer) {
+    return (
+      <ChipMetricScreen
+        customer={metricCustomer}
+        seg={seg}
+        moneySpan={moneySpan}
+        ym={ym}
+        onBack={() => setMetricId(null)}
+      />
+    );
+  }
+
+  const resetSort = (id: FilterId) => {
+    setSeg(id);
+    setMoneySpan("cur");
+    setMonthSpan(0);
+    setCustom(null);
+  };
 
   return (
     <div className="app-scroll">
@@ -112,18 +491,51 @@ export function CustomersScreen() {
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
-      <div className="filters">
-        {filters.map((f) => (
-          <button
-            key={f.id}
-            className={`chip ${seg === f.id ? "on" : ""}`}
-            type="button"
-            onClick={() => setSeg(f.id)}
-          >
+      <div className="sort-tabs">
+        {sorts.map((f) => (
+          <button key={f.id} className={seg === f.id ? "on" : ""} type="button" onClick={() => resetSort(f.id)}>
             {f.label}
           </button>
         ))}
       </div>
+      <RangeCard>
+        {seg === "buy" || seg === "unpaid" ? (
+          <PeriodPicks value={moneySpan} options={MONEY_OPTS} onChange={setMoneySpan} />
+        ) : null}
+        {seg === "new" ? (
+          <>
+            <StepperRow
+              label="시작"
+              value={formatDot(dateStart)}
+              onMinus={() => bumpDate("start", -1)}
+              onPlus={() => bumpDate("start", 1)}
+              minusOff={dateStart <= joinMin}
+              plusOff={dateStart >= TODAY}
+            />
+            <StepperRow
+              label="종료"
+              value={formatDot(dateEnd)}
+              onMinus={() => bumpDate("end", -1)}
+              onPlus={() => bumpDate("end", 1)}
+              minusOff={dateEnd <= joinMin}
+              plusOff={dateEnd >= TODAY}
+            />
+          </>
+        ) : null}
+        {seg === "birthday" || seg === "points" ? (
+          <PeriodPicks
+            value={monthSpan}
+            options={
+              [
+                [0, "이번달"],
+                [1, "다음달"],
+                [2, "다다음달"],
+              ] as const
+            }
+            onChange={setMonthSpan}
+          />
+        ) : null}
+      </RangeCard>
       <div className="pad cust-count">{list.length}명</div>
       <div className="pad">
         <div className="card list-card cust-list">
@@ -133,13 +545,21 @@ export function CustomersScreen() {
             <span className="cust-type">{chipHead(seg)}</span>
           </div>
           {list.map((c) => (
-            <button key={c.id} className="person" type="button" onClick={() => nav.go("customer", { customerId: c.id })}>
-              <span className="cust-no">{custNo(c.id)}</span>
-              <span className="who">
-                <b>{c.name}</b>
-              </span>
-              <span className="cust-type">{chipMeta(c, seg)}</span>
-            </button>
+            <div key={c.id} className="cust-row">
+              <button className="cust-main" type="button" onClick={() => nav.go("customer", { customerId: c.id })}>
+                <span className="cust-no">{custNo(c.id)}</span>
+                <span className="who">
+                  <span className="name-row">
+                    <b>{c.name}</b>
+                    <i className="cust-kind">{shortType(c)}</i>
+                  </span>
+                </span>
+              </button>
+              <button className="cust-metric" type="button" onClick={() => setMetricId(c.id)}>
+                <span className="cust-metric-txt">{chipMeta(c, seg, moneySpan, ym)}</span>
+                <IconChevron width={14} height={14} />
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -210,7 +630,7 @@ export function CustomerScreen() {
         <div className="cd-metrics">
           <button className="cd-points" type="button" onClick={() => setTab("point")}>
             <span>뷰티포인트</span>
-            <b>{c.beautyPoints.toLocaleString("ko-KR")}P</b>
+            <b>{custType(c).startsWith("통합") ? `${c.beautyPoints.toLocaleString("ko-KR")}P` : "미가입"}</b>
           </button>
           <button className="cd-points" type="button" onClick={() => setTab("buy")}>
             <span>미수금액</span>

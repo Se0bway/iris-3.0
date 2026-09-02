@@ -1,16 +1,17 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { TODAY, counselor, customers, homeGroups, hqPosts } from "../data";
 import {
   IconBottle,
   IconCake,
   IconChevron,
   IconDown,
-  IconPhone,
   IconPill,
+  IconSpark,
   IconStethoscope,
   IconTrend,
+  IconWon,
 } from "../icons";
-import { custType, dueText, formatDot, koreanDate, urgencyScore } from "../lib";
+import { custType, dueText, formatDot, koreanDate } from "../lib";
 import { useNav } from "../nav";
 import type { Customer } from "../types";
 import { AppHeader } from "../ui";
@@ -21,7 +22,13 @@ const icons = {
   green: IconTrend,
   orange: IconCake,
   teal: IconPill,
-  red: IconPhone,
+  red: IconSpark,
+};
+
+const iconById: Record<string, (typeof icons)[keyof typeof icons]> = {
+  birthday: IconCake,
+  pointsExpire: IconSpark,
+  reward: IconWon,
 };
 
 function PersonRow({
@@ -56,47 +63,18 @@ function PersonRow({
 export function HomeScreen() {
   const nav = useNav();
   const [open, setOpen] = useState("");
-  const mustCall = useMemo(() => {
-    const sourceMap = new Map<string, string[]>();
-    for (const g of homeGroups) {
-      for (const id of g.ids) {
-        const prev = sourceMap.get(id) ?? [];
-        prev.push(g.title);
-        sourceMap.set(id, prev);
-      }
-    }
-    return [...sourceMap.entries()]
-      .map(([id, sources]) => {
-        const c = customers.find((x) => x.id === id);
-        if (!c) return null;
-        return { c, sources, score: urgencyScore(c, sources) };
-      })
-      .filter((x): x is NonNullable<typeof x> => Boolean(x))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
-  }, []);
 
-  const blocks = [
-    {
-      id: "must",
-      title: "오늘 반드시 연락!",
-      desc: "피부진단·신제품·이탈 등에서 가장 시급한 고객 10명",
-      tone: "red" as const,
-      count: mustCall.length,
-      people: mustCall.map((x) => ({ c: x.c, why: x.sources[0] })),
-    },
-    ...homeGroups.map((g) => ({
-      id: g.id,
-      title: g.title,
-      desc: g.desc,
-      tone: g.tone,
-      count: g.count,
-      people: g.ids
-        .map((id) => customers.find((c) => c.id === id))
-        .filter((c): c is Customer => Boolean(c))
-        .map((c) => ({ c, why: undefined as string | undefined })),
-    })),
-  ];
+  const blocks = homeGroups.map((g) => ({
+    id: g.id,
+    title: g.title,
+    desc: g.desc,
+    tone: g.tone,
+    count: g.count,
+    people: g.ids
+      .map((id) => customers.find((c) => c.id === id))
+      .filter((c): c is Customer => Boolean(c))
+      .map((c) => ({ c, why: undefined as string | undefined })),
+  }));
 
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
@@ -146,7 +124,7 @@ export function HomeScreen() {
       </div>
       <div className="home-list">
         {blocks.map((g) => {
-          const Icon = icons[g.tone];
+          const Icon = iconById[g.id] ?? icons[g.tone];
           const expanded = open === g.id;
           return (
             <div className="acc" key={g.id}>

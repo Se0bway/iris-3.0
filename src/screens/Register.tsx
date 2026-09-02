@@ -141,6 +141,7 @@ export function RegisterScreen() {
       health: "",
       anniversaries: wyy && wmm && wdd ? [{ type: "결혼기념일", date: `${wyy}-${wmm}-${wdd}` }] : [],
       beautyPoints: 0,
+      pointExpires: [],
       pointHistory: [],
       skinDiagnosis: "",
       timeline: [

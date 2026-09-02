@@ -74,6 +74,12 @@ export const customers: Customer[] = [
     health: "양호",
     anniversaries: [{ type: "생일", date: "07-15" }],
     beautyPoints: 24600,
+    pointsExpireAt: "2026-08-31",
+    pointExpires: [
+      { id: "c13-e1", expireAt: "2026-08-31", amount: 12600, kind: "멤버십 실적", note: "2025 하반기 멤버십 실적 적립" },
+      { id: "c13-e2", expireAt: "2026-08-31", amount: 8000, kind: "구매적립", note: "자음생크림 구매 적립" },
+      { id: "c13-e3", expireAt: "2026-08-20", amount: 4000, kind: "프로모션", note: "8월 캠페인 보너스" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-05-10", type: "earn", label: "자음생크림 구매 적립", amount: 3800 },
     ],
@@ -89,8 +95,38 @@ export const customers: Customer[] = [
       { id: "n3", date: "2026.06.02", topic: "예약 안내", body: "가을 진단 예약 관심. D-3 도래 시 재연락." },
     ],
     ledger: [
+      {
+        id: "l0",
+        date: "2026-07-18",
+        issuedAt: "2026-07-18 22:28:42",
+        type: "sale",
+        product: "바이탈뷰티 우먼밸런스 골드",
+        amount: 300000,
+        status: "수금완료",
+        coupon: 0,
+        pointsEarn: 0,
+        pointsUse: 0,
+        lines: [
+          { code: "110771445", name: "바이탈뷰티 우먼밸런스 골드 210C_2입세트(25)", qty: 1, amount: 120000 },
+          { code: "110771512", name: "바이탈뷰티 조이스텝 골드 105T(26)", qty: 1, amount: 180000 },
+        ],
+      },
       { id: "l1", date: "2026-05-10", type: "sale", product: "설화수 자음생크림", amount: 220000, status: "부분수금" },
       { id: "l2", date: "2026-05-10", type: "collect", amount: 152000, status: "가상계좌" },
+      { id: "l4", date: "2026-08-08", type: "sale", product: "설화수 윤조에센스", amount: 200000, status: "수금완료" },
+      {
+        id: "l3",
+        date: "2026-06-12",
+        issuedAt: "2026-06-12 15:41:08",
+        type: "sale",
+        product: "헤라 블랙쿠션",
+        amount: 68000,
+        status: "취소",
+        coupon: 0,
+        pointsEarn: 0,
+        pointsUse: 0,
+        lines: [{ code: "21004521", name: "헤라 블랙쿠션", qty: 1, amount: 68000 }],
+      },
     ],
     aiHint: "피부진단 D-3 · 신제품 구매 가능성 높음",
     recommendedAction: "카카오톡",
@@ -135,6 +171,11 @@ export const customers: Customer[] = [
       { type: "결혼기념일", date: "10-03" },
     ],
     beautyPoints: 18420,
+    pointsExpireAt: "2026-09-30",
+    pointExpires: [
+      { id: "c1-e1", expireAt: "2026-09-30", amount: 10420, kind: "구매적립", note: "헤라 블랙쿠션 구매 적립" },
+      { id: "c1-e2", expireAt: "2026-09-15", amount: 8000, kind: "멤버십 실적", note: "2026 상반기 멤버십 실적 적립" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-06-26", type: "earn", label: "자음생크림 구매 적립", amount: 4200 },
       { id: "p2", date: "2026-05-12", type: "use", label: "쿠션 결제 사용", amount: -8000 },
@@ -195,6 +236,11 @@ export const customers: Customer[] = [
     health: "양호",
     anniversaries: [{ type: "생일", date: "08-25" }],
     beautyPoints: 33200,
+    pointsExpireAt: "2026-10-31",
+    pointExpires: [
+      { id: "c2-e1", expireAt: "2026-10-31", amount: 18200, kind: "구매적립", note: "설화수 자음생 세트 적립" },
+      { id: "c2-e2", expireAt: "2026-10-31", amount: 15000, kind: "프로모션", note: "가을 캠페인 보너스" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-07-02", type: "earn", label: "블랙쿠션 구매 적립", amount: 3600 },
     ],
@@ -250,6 +296,10 @@ export const customers: Customer[] = [
     health: "피로",
     anniversaries: [{ type: "생일", date: "01-09" }],
     beautyPoints: 2100,
+    pointsExpireAt: "2026-08-20",
+    pointExpires: [
+      { id: "c3-e1", expireAt: "2026-08-20", amount: 2100, kind: "1년무거래소멸", note: "1년 무거래 소멸 예정" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-04-18", type: "earn", label: "레티놀 구매 적립", amount: 2100 },
     ],
@@ -352,6 +402,12 @@ export const customers: Customer[] = [
       { type: "결혼기념일", date: "09-18" },
     ],
     beautyPoints: 81200,
+    pointsExpireAt: "2026-09-15",
+    pointExpires: [
+      { id: "c5-e1", expireAt: "2026-09-15", amount: 50000, kind: "멤버십 실적", note: "VIP 멤버십 실적 적립" },
+      { id: "c5-e2", expireAt: "2026-09-15", amount: 25000, kind: "구매적립", note: "진설 세트 구매 적립" },
+      { id: "c5-e3", expireAt: "2026-09-30", amount: 6200, kind: "프로모션", note: "9월 체험 프로모션" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-08-01", type: "earn", label: "진설 세트 적립", amount: 12000 },
     ],
@@ -409,6 +465,11 @@ export const customers: Customer[] = [
     health: "양호",
     anniversaries: [{ type: "생일", date: "08-22" }],
     beautyPoints: 9600,
+    pointsExpireAt: "2026-08-22",
+    pointExpires: [
+      { id: "c6-e1", expireAt: "2026-08-22", amount: 5600, kind: "구매적립", note: "라네즈 워터뱅크 구매 적립" },
+      { id: "c6-e2", expireAt: "2026-08-22", amount: 4000, kind: "프로모션", note: "8월 샘플 프로모션" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-07-11", type: "earn", label: "세럼 구매 적립", amount: 2400 },
     ],
@@ -428,7 +489,7 @@ export const customers: Customer[] = [
     id: "c7",
     name: "오영희",
     phone: "010-7741-2098",
-    birth: "1958-11-19",
+    birth: "1958-10-19",
     age: 68,
     address: "서울 영등포구 여의도동",
     joinedAt: "2024-06-03",
@@ -455,8 +516,12 @@ export const customers: Customer[] = [
     purpose: "이너뷰티",
     habit: "아침 섭취",
     health: "피로, 수면 부족",
-    anniversaries: [{ type: "생일", date: "11-19" }],
+    anniversaries: [{ type: "생일", date: "10-19" }],
     beautyPoints: 4400,
+    pointsExpireAt: "2026-10-08",
+    pointExpires: [
+      { id: "c7-e1", expireAt: "2026-10-08", amount: 4400, kind: "프로모션", note: "가을 캠페인 보너스" },
+    ],
     pointHistory: [],
     skinDiagnosis: "피부보다는 이너뷰티 니즈가 큼",
     timeline: [
@@ -503,6 +568,10 @@ export const customers: Customer[] = [
     health: "양호",
     anniversaries: [{ type: "생일", date: "02-07" }],
     beautyPoints: 1280,
+    pointsExpireAt: "2026-09-12",
+    pointExpires: [
+      { id: "c8-e1", expireAt: "2026-09-12", amount: 1280, kind: "구매적립", note: "아이오페 레티놀 구매 적립" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-08-14", type: "earn", label: "첫 구매 적립", amount: 1280 },
     ],
@@ -561,6 +630,11 @@ export const customers: Customer[] = [
       { type: "기타", date: "12-25 가족모임" },
     ],
     beautyPoints: 64000,
+    pointsExpireAt: "2026-08-28",
+    pointExpires: [
+      { id: "c9-e1", expireAt: "2026-08-28", amount: 40000, kind: "멤버십 실적", note: "2025 하반기 멤버십 실적 적립" },
+      { id: "c9-e2", expireAt: "2026-08-28", amount: 24000, kind: "구매적립", note: "설화수 자음생 구매 적립" },
+    ],
     pointHistory: [
       { id: "p1", date: "2026-07-28", type: "earn", label: "자음생 세트 적립", amount: 9000 },
     ],
@@ -660,6 +734,10 @@ export const customers: Customer[] = [
     health: "양호",
     anniversaries: [{ type: "생일", date: "04-04" }],
     beautyPoints: 11000,
+    pointsExpireAt: "2026-10-31",
+    pointExpires: [
+      { id: "c11-e1", expireAt: "2026-10-31", amount: 11000, kind: "1년무거래소멸", note: "1년 무거래 소멸 예정" },
+    ],
     pointHistory: [],
     skinDiagnosis: "탄력 케어, 레티놀 주기 도래",
     timeline: [
@@ -706,6 +784,10 @@ export const customers: Customer[] = [
     health: "양호",
     anniversaries: [{ type: "생일", date: "08-21" }],
     beautyPoints: 800,
+    pointsExpireAt: "2026-08-31",
+    pointExpires: [
+      { id: "c12-e1", expireAt: "2026-08-31", amount: 800, kind: "구매적립", note: "바이탈뷰티 슈퍼콜라겐 적립" },
+    ],
     pointHistory: [],
     skinDiagnosis: "민감, 장기 미방문",
     timeline: [
@@ -929,6 +1011,30 @@ export const sitemap: NavItem[] = [
 
 export const homeGroups = [
   {
+    id: "birthday",
+    title: "기념일",
+    desc: "생일 또는 기념일을 맞이한 고객",
+    count: 4,
+    tone: "orange" as const,
+    ids: ["c6", "c2", "c10", "c12"],
+  },
+  {
+    id: "pointsExpire",
+    title: "뷰티포인트 소멸예정",
+    desc: "이번 달 포인트가 소멸되는 고객",
+    count: 4,
+    tone: "red" as const,
+    ids: ["c6", "c9", "c13", "c12"],
+  },
+  {
+    id: "reward",
+    title: "리워드 구매금액 달성",
+    desc: "리워드 구매금액 구간에 도달한 고객",
+    count: 3,
+    tone: "purple" as const,
+    ids: ["c5", "c9", "c13"],
+  },
+  {
     id: "skin",
     title: "피부진단",
     desc: "진단 추천 주기가 도래한 고객",
@@ -951,14 +1057,6 @@ export const homeGroups = [
     count: 9,
     tone: "green" as const,
     ids: ["c3", "c7", "c12"],
-  },
-  {
-    id: "birthday",
-    title: "생일/기념일",
-    desc: "생일 또는 기념일을 맞이한 고객",
-    count: 6,
-    tone: "orange" as const,
-    ids: ["c6", "c2", "c10", "c12"],
   },
   {
     id: "health",
@@ -995,7 +1093,7 @@ export const screenNotes: Record<string, string> = {
   push: "벨 아이콘으로 진입하는 Push 알림 목록",
   promo: "판촉 조회 / 주문",
   order: "본품 주문 · 재고 확인",
-  slips: "고객을 고른 뒤 판매·수금 전표를 조회합니다",
+  slips: "전표조회 또는 취소전표 조회를 고른 뒤 고객을 검색합니다",
   sales: "고객 검색 후 본인 재고에서 상품을 골라 판매 등록",
   collection: "현금·카드·무이자혜택·결제구분으로 수금 등록. 판매 ≠ 수금",
   status: "카운셀러 마감현황 — 가장 중요한 실적 메뉴",

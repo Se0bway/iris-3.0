@@ -271,8 +271,24 @@ export default function App() {
             <div className="phone">
               <div className="phone-status">
                 <span>9:41</span>
-                <span>IRIS</span>
-                <span>100%</span>
+                <span className="phone-status-icons" aria-hidden>
+                  <svg viewBox="0 0 16 16" width="14" height="14">
+                    <rect x="1" y="10" width="2.2" height="4" rx=".4" fill="currentColor" />
+                    <rect x="4.6" y="7.5" width="2.2" height="6.5" rx=".4" fill="currentColor" />
+                    <rect x="8.2" y="5" width="2.2" height="9" rx=".4" fill="currentColor" />
+                    <rect x="11.8" y="2.5" width="2.2" height="11.5" rx=".4" fill="currentColor" opacity=".35" />
+                  </svg>
+                  <svg viewBox="0 0 16 16" width="14" height="14">
+                    <path d="M2.2 6.6a8.4 8.4 0 0 1 11.6 0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M4.6 9.2a5 5 0 0 1 6.8 0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <circle cx="8" cy="12.4" r="1.2" fill="currentColor" />
+                  </svg>
+                  <svg viewBox="0 0 22 12" width="20" height="11">
+                    <rect x=".7" y=".7" width="18" height="10.6" rx="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                    <rect x="2.2" y="2.3" width="13.6" height="7.4" rx="1" fill="currentColor" />
+                    <rect x="19.4" y="3.6" width="1.8" height="4.8" rx=".6" fill="currentColor" />
+                  </svg>
+                </span>
               </div>
               <div className="app">
                 <ScreenInner screen={state.screen} />
@@ -356,6 +372,9 @@ export default function App() {
                     })}
                   </nav>
                 ) : null}
+              </div>
+              <div className="phone-gesture" aria-hidden>
+                <span />
               </div>
               {state.toast ? <div className="toast">{state.toast}</div> : null}
             </div>

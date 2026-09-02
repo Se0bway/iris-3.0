@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconBell, IconChevron } from "./icons";
+import { IconBack, IconBell, IconChevron } from "./icons";
 import { useNav } from "./nav";
 import type { Level } from "./types";
 
@@ -108,9 +108,7 @@ export function TopBar({
       {onBack ? (
         <div className="back-title">
           <button type="button" onClick={onBack} aria-label="뒤로">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M15 5 8 12l7 7" />
-            </svg>
+            <IconBack width={22} height={22} />
           </button>
           <h2>{title}</h2>
         </div>

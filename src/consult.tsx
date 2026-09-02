@@ -2,12 +2,17 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import { TODAY, customers as seed } from "./data";
 import type { ConsultNote, Customer } from "./types";
 
+function slipKey(customerId: string, ledgerId: string) {
+  return `${customerId}:${ledgerId}`;
+}
+
 interface ConsultApi {
   list: Customer[];
   nextNo: () => number;
   addCustomer: (c: Customer) => void;
   notesOf: (customerId: string) => ConsultNote[];
   addNote: (customerId: string, topic: string, body: string) => void;
+  cancelSlip: (customerId: string, ledgerId: string) => void;
 }
 
 const ConsultContext = createContext<ConsultApi | null>(null);
@@ -19,8 +24,17 @@ export function custNoOf(id: string) {
 export function ConsultProvider({ children }: { children: ReactNode }) {
   const [extra, setExtra] = useState<Record<string, ConsultNote[]>>({});
   const [added, setAdded] = useState<Customer[]>([]);
+  const [cancelled, setCancelled] = useState<Record<string, true>>({});
 
-  const list = useMemo(() => [...added, ...seed], [added]);
+  const list = useMemo(() => {
+    const raw = [...added, ...seed];
+    const keys = Object.keys(cancelled);
+    if (keys.length === 0) return raw;
+    return raw.map((c) => ({
+      ...c,
+      ledger: c.ledger.map((r) => (cancelled[slipKey(c.id, r.id)] ? { ...r, status: "취소" } : r)),
+    }));
+  }, [added, cancelled]);
 
   const api = useMemo<ConsultApi>(
     () => ({
@@ -39,6 +53,9 @@ export function ConsultProvider({ children }: { children: ReactNode }) {
           body,
         };
         setExtra((s) => ({ ...s, [customerId]: [note, ...(s[customerId] ?? [])] }));
+      },
+      cancelSlip: (customerId, ledgerId) => {
+        setCancelled((s) => ({ ...s, [slipKey(customerId, ledgerId)]: true }));
       },
     }),
     [extra, list]

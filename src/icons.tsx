@@ -54,7 +54,8 @@ export const IconUser = (p: P) => (
 );
 export const IconBack = (p: P) => (
   <I {...p}>
-    <path d="M15 5 8 12l7 7" />
+    <path d="M19 12H5" />
+    <path d="M12 19l-7-7 7-7" />
   </I>
 );
 export const IconSearch = (p: P) => (
