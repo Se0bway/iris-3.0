@@ -15,6 +15,7 @@ export const counselor = {
   account: "우리 1002-***-****821",
   creditLimit: 20_000_000,
   creditRemain: 11_680_000,
+  stockTurnDays: 5.8,
 };
 
 export const kpi = {
@@ -266,6 +267,7 @@ export const customers: Customer[] = [
   {
     id: "c3",
     name: "박미경",
+    stopped: true,
     phone: "010-6670-4412",
     birth: "1960-01-09",
     age: 66,
@@ -754,6 +756,7 @@ export const customers: Customer[] = [
   {
     id: "c12",
     name: "조민서",
+    stopped: true,
     phone: "010-9901-2234",
     birth: "1953-08-21",
     age: 73,
@@ -835,6 +838,55 @@ export const products = [
   { id: "p4", code: "31006712", brand: "아이오페", name: "레티놀 엑스퍼트", price: 180000, stock: 8, type: "본품" },
   { id: "p5", code: "41002308", brand: "라네즈", name: "워터뱅크 크림", price: 42000, stock: 20, type: "본품" },
   { id: "p6", code: "51003155", brand: "바이탈뷰티", name: "슈퍼콜라겐 30일", price: 75000, stock: 11, type: "본품" },
+];
+
+export const productSalesBase = [
+  { id: "p1", qty: 18 },
+  { id: "p2", qty: 6 },
+  { id: "p3", qty: 22 },
+  { id: "p4", qty: 11 },
+  { id: "p5", qty: 15 },
+  { id: "p6", qty: 19 },
+];
+
+export const productOrders = [
+  {
+    id: "o1",
+    no: "PO-260821-014",
+    date: "2026-08-21",
+    status: "입고완료",
+    items: [
+      { productId: "p1", qty: 4 },
+      { productId: "p3", qty: 8 },
+    ],
+  },
+  {
+    id: "o2",
+    no: "PO-260818-009",
+    date: "2026-08-18",
+    status: "입고완료",
+    items: [
+      { productId: "p2", qty: 2 },
+      { productId: "p4", qty: 3 },
+    ],
+  },
+  {
+    id: "o3",
+    no: "PO-260815-003",
+    date: "2026-08-15",
+    status: "배송중",
+    items: [
+      { productId: "p5", qty: 10 },
+      { productId: "p6", qty: 6 },
+    ],
+  },
+  {
+    id: "o4",
+    no: "PO-260812-021",
+    date: "2026-08-12",
+    status: "접수",
+    items: [{ productId: "p1", qty: 6 }],
+  },
 ];
 
 export const promos = [
@@ -947,6 +999,7 @@ export const sitemap: NavItem[] = [
     label: "CRM",
     children: [
       { id: "customers", label: "고객목록" },
+      { id: "stopped", label: "중지고객" },
       { id: "register", label: "고객등록" },
       { id: "customer", label: "고객상세" },
       { id: "message", label: "메시지 생성" },
@@ -966,10 +1019,12 @@ export const sitemap: NavItem[] = [
   },
   {
     id: "work",
-    label: "주문",
+    label: "주문 / 입금",
     children: [
       { id: "order", label: "본품 주문" },
+      { id: "orderLookup", label: "주문조회" },
       { id: "stock", label: "재고조회" },
+      { id: "deposit", label: "가상계좌 입금내역" },
     ],
   },
   {
@@ -997,9 +1052,12 @@ export const sitemap: NavItem[] = [
     label: "마이오피스",
     children: [
       { id: "profile", label: "내정보확인" },
+      { id: "perf", label: "영업실적" },
+      { id: "perfMine", label: "내 영업실적" },
+      { id: "perfGroup", label: "그룹원 실적" },
       { id: "members", label: "그룹원 상태 요약" },
       { id: "incentive", label: "인센티브 조회" },
-      { id: "editshop", label: "에딧샵 커미션" },
+      { id: "editshop", label: "에딧샵 영업실적" },
       { id: "attendance", label: "출근 현황" },
       { id: "live", label: "라이브 영상 시청" },
       { id: "education", label: "본사 교육" },
@@ -1078,30 +1136,35 @@ export const screenNotes: Record<string, string> = {
   login: "카운셀러 번호 로그인 · MFA · 사업자등록 여부에 따른 권한",
   mfa: "멀티팩터 인증 단계",
   home: "인사 · 본사 게시판 · 오늘 확인할 고객. CRM 카테고리는 기본 닫힘",
-  customers: "검색 · 필터 · 세그먼트 정렬의 고객목록",
+  customers: "검색 · 정렬 · 중지고객 보기 링크",
+  stopped: "중지된 고객만 검색·조회. 상세에서 정상으로 되돌릴 수 있습니다",
   register: "개인정보 동의 · 필수/선택 정보로 신규 고객을 등록합니다",
   customer: "프로필 · 구매이력 · 상담이력 · 뷰티포인트 탭과 상담포인트",
   message: "세그먼트를 반영한 AI 문구 자동생성 · 복사 후 카카오톡/문자 발송",
   skindiag: "AI 피부진단 링크발송 — 고객에게 진단 링크를 보냅니다",
   guestskin: "비고객·방문객 현장 피부진단. 고객 등록 없이 촬영하고 결과를 공유합니다",
   note: "고객을 고른 뒤 상담일지를 작성합니다. 고객 상세 상담일지에 바로 반영됩니다",
-  work: "여신한도 · 잔여한도 · 본인 재고 현황을 먼저 보고 본품을 주문합니다",
-  trade: "전표조회 · 판매 · 수금. 메뉴를 고른 뒤 고객을 검색합니다",
+  work: "본품 주문 · 주문조회 · 재고조회 · 가상계좌 입금내역",
+  orderLookup: "발주한 본품 목록 · 입고 상태 · 수량 · 금액",
+  perf: "사이드바 전용 허브 — 내 실적과 그룹원 실적 간단 리포트",
+  perfMine: "마이오피스 A타입 — 월 이동 · 총합계 · 고객별 · 상품별 · 브랜드별",
+  perfGroup: "마이오피스 그룹원 — 그룹원별 판매실적 · 월 조회",
+  trade: "고객판매 · 수금 · 미수 · 입금 요약 후 전표조회 · 판매 · 수금",
   chat: "뉴커머스 업무지식 챗봇",
   links: "뷰티스퀘어 · 에딧샵 외부 링크",
   board: "NEXT 공지 게시판 연동",
   push: "벨 아이콘으로 진입하는 Push 알림 목록",
   promo: "판촉 조회 / 주문",
-  order: "본품 주문 · 재고 확인",
+  order: "한도·재고회전일 · 상품검색 · 카트 · 주문점검 후 발주",
   slips: "전표조회 또는 취소전표 조회를 고른 뒤 고객을 검색합니다",
-  sales: "고객 검색 후 본인 재고에서 상품을 골라 판매 등록",
+  sales: "상품등록 → 구매계약서(결제·공급) → 판매등록결과 · 판매 ≠ 수금",
   collection: "현금·카드·무이자혜택·결제구분으로 수금 등록. 판매 ≠ 수금",
   status: "카운셀러 마감현황 — 가장 중요한 실적 메뉴",
   history: "고객별 판매 · 판수미 조회",
   plcc: "PLCC 발급 / 미발급 / 혜택",
   points: "뷰티포인트 · 소멸예정 · 선물하기",
   anniversaries: "고객 기념일 조회",
-  mypage: "마이오피스 — A타입 · B타입 · 출근 · 그룹원 · 수금 · 재고 · 본사 교육",
+  mypage: "마이오피스 — A타입(내 실적) · B타입(에딧샵 실적) · 그룹원 실적 · 출근 · 수금 · 재고 · 본사 교육",
   education: "본사 수료 교육 — 디바이스 마스터 · 직급자 교육 등",
   members: "그룹원 상태 요약 — 총원 매출 · 미수회전일 · 인센티브 수혜예상",
   attendance: "출근 등록 / 캘린더 현황",
@@ -1110,6 +1173,6 @@ export const screenNotes: Record<string, string> = {
   stock: "재고합계 · 가격합계 · 품목 상세",
   deposit: "가상계좌 입금내역 · 처리구분 · 상세보기 · 등록요청",
   incentive: "본인매출 · 고객판매 · 미수회전일 · 예상 인센티브",
-  editshop: "에딧샵 커미션 — 외부 서비스 연결",
+  editshop: "마이오피스 B타입 — 월별 에딧샵 매출·커미션 · 상품별·브랜드별",
   live: "라이브 영상 시청 — 뷰티스퀘어 연결",
 };

@@ -13,6 +13,7 @@ interface ConsultApi {
   notesOf: (customerId: string) => ConsultNote[];
   addNote: (customerId: string, topic: string, body: string) => void;
   cancelSlip: (customerId: string, ledgerId: string) => void;
+  setStopped: (customerId: string, stopped: boolean) => void;
 }
 
 const ConsultContext = createContext<ConsultApi | null>(null);
@@ -25,16 +26,21 @@ export function ConsultProvider({ children }: { children: ReactNode }) {
   const [extra, setExtra] = useState<Record<string, ConsultNote[]>>({});
   const [added, setAdded] = useState<Customer[]>([]);
   const [cancelled, setCancelled] = useState<Record<string, true>>({});
+  const [life, setLife] = useState<Record<string, boolean>>({});
 
   const list = useMemo(() => {
     const raw = [...added, ...seed];
-    const keys = Object.keys(cancelled);
-    if (keys.length === 0) return raw;
+    const hasCancel = Object.keys(cancelled).length > 0;
+    const hasLife = Object.keys(life).length > 0;
+    if (!hasCancel && !hasLife) return raw;
     return raw.map((c) => ({
       ...c,
-      ledger: c.ledger.map((r) => (cancelled[slipKey(c.id, r.id)] ? { ...r, status: "취소" } : r)),
+      stopped: c.id in life ? life[c.id] : c.stopped,
+      ledger: hasCancel
+        ? c.ledger.map((r) => (cancelled[slipKey(c.id, r.id)] ? { ...r, status: "취소" } : r))
+        : c.ledger,
     }));
-  }, [added, cancelled]);
+  }, [added, cancelled, life]);
 
   const api = useMemo<ConsultApi>(
     () => ({
@@ -56,6 +62,9 @@ export function ConsultProvider({ children }: { children: ReactNode }) {
       },
       cancelSlip: (customerId, ledgerId) => {
         setCancelled((s) => ({ ...s, [slipKey(customerId, ledgerId)]: true }));
+      },
+      setStopped: (customerId, stopped) => {
+        setLife((s) => ({ ...s, [customerId]: stopped }));
       },
     }),
     [extra, list]

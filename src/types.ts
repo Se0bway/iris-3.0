@@ -3,6 +3,7 @@ export type ScreenId =
   | "mfa"
   | "home"
   | "customers"
+  | "stopped"
   | "customer"
   | "message"
   | "chat"
@@ -10,8 +11,12 @@ export type ScreenId =
   | "board"
   | "push"
   | "work"
+  | "perf"
+  | "perfMine"
+  | "perfGroup"
   | "promo"
   | "order"
+  | "orderLookup"
   | "trade"
   | "slips"
   | "sales"
@@ -173,6 +178,7 @@ export interface Customer {
   lastDiagnosis?: string | null;
   diagnosisOffset?: number | null;
   gender?: "f" | "m";
+  stopped?: boolean;
 }
 
 export interface Member {

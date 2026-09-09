@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { closing, counselor, deposits, hqEducations, members, products, RANKS, vaAccount } from "../data";
+import { closing, counselor, deposits, hqEducations, members, products, productSalesBase, RANKS, vaAccount } from "../data";
 import { krw } from "../lib";
 import { useNav } from "../nav";
+import { MonthBar, PerfTable, usePerfMonth } from "./Perf";
 import { AppHeader, TopBar } from "../ui";
 import { IconChevron, IconCrown, IconSearch } from "../icons";
 
@@ -74,7 +75,7 @@ export function MyPageScreen() {
               직급
             </button>
           </div>
-          <button className="mp-team" type="button" onClick={() => nav.go("members")}>
+          <button className="mp-team" type="button" onClick={() => nav.go("perfGroup")}>
             <div className="mp-team-h">
               <b>그룹원 상태 요약</b>
               <IconChevron width={16} height={16} />
@@ -94,7 +95,7 @@ export function MyPageScreen() {
             </div>
           </button>
           <div className="mp-types">
-            <button className="mp-type" type="button" onClick={() => nav.go("incentive")}>
+            <button className="mp-type" type="button" onClick={() => nav.go("perfMine")}>
               <span className="mp-type-tag">A타입</span>
               <div className="mp-type-main">
                 <div className="l">당월 고객판매</div>
@@ -259,14 +260,79 @@ export function IncentiveScreen() {
 
 export function EditShopScreen() {
   const nav = useNav();
+  const { y, m, scale, atLatest, move } = usePerfMonth();
+  const [tab, setTab] = useState<"product" | "brand">("product");
+
+  const productRows = useMemo(() => {
+    return productSalesBase
+      .map((row) => {
+        const p = products.find((x) => x.id === row.id);
+        if (!p) return null;
+        const qty = Math.max(1, Math.round(row.qty * scale * 0.33));
+        return { id: p.id, brand: p.brand, name: p.name, qty, amount: qty * p.price };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null)
+      .sort((a, b) => b.amount - a.amount);
+  }, [scale]);
+
+  const brandRows = useMemo(() => {
+    const map = new Map<string, { brand: string; qty: number; amount: number }>();
+    for (const r of productRows) {
+      const cur = map.get(r.brand) ?? { brand: r.brand, qty: 0, amount: 0 };
+      cur.qty += r.qty;
+      cur.amount += r.amount;
+      map.set(r.brand, cur);
+    }
+    return [...map.values()].sort((a, b) => b.amount - a.amount);
+  }, [productRows]);
+
+  const sales = Math.round(editShopSales * scale);
+  const commission = Math.round(editCommission * scale);
+
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
-      <TopBar title="에딧샵 커미션" onBack={nav.back} />
-      <div className="ext-card">
-        <div style={{ fontSize: 12, color: "var(--muted)" }}>예상 커미션</div>
-        <div className="big-num">{krw(editCommission)}</div>
-        <p>에딧샵에서 발생한 커미션 상세와 정산 내역을 확인합니다. 에딧샵 서비스로 이동합니다.</p>
-        <button className="btn primary" type="button" onClick={() => nav.setToast("에딧샵으로 연결됩니다. 로컬 프로토타입에서는 이동하지 않습니다.")}>
+      <TopBar title="에딧샵 영업실적" onBack={() => nav.go("mypage")} />
+      <MonthBar y={y} m={m} atLatest={atLatest} move={move} />
+      <div className="perf-sum">
+        <h4>총 합계</h4>
+        <div className="perf-sum-row">
+          <span>에딧샵 매출</span>
+          <b>{krw(sales)}</b>
+        </div>
+        <div className="perf-sum-row">
+          <span>커미션</span>
+          <b>{krw(commission)}</b>
+        </div>
+      </div>
+      <div className="perf-tabs">
+        {(
+          [
+            ["product", "상품별"],
+            ["brand", "브랜드별"],
+          ] as const
+        ).map(([id, label]) => (
+          <button key={id} className={tab === id ? "on" : ""} type="button" onClick={() => setTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "product" ? (
+        <PerfTable
+          head={["상품", "수량", "판매금액"]}
+          rows={productRows.map((r) => [r.name, `${r.qty}개`, krw(r.amount)])}
+        />
+      ) : (
+        <PerfTable
+          head={["브랜드", "수량", "판매금액"]}
+          rows={brandRows.map((r) => [r.brand, `${r.qty}개`, krw(r.amount)])}
+        />
+      )}
+      <div className="pad" style={{ paddingTop: 0 }}>
+        <button
+          className="btn primary"
+          type="button"
+          onClick={() => nav.setToast("에딧샵으로 연결됩니다. 로컬 프로토타입에서는 이동하지 않습니다.")}
+        >
           에딧샵 연결
         </button>
       </div>

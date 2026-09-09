@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { screenNotes, sitemap } from "./data";
+import { downloadIaExcel } from "./exportIa";
 import { ConsultProvider } from "./consult";
 import {
   IconBox,
@@ -7,7 +8,6 @@ import {
   IconChat,
   IconCheck,
   IconDown,
-  IconEdit,
   IconHome,
   IconUser,
   IconUsers,
@@ -15,8 +15,9 @@ import {
 } from "./icons";
 import { NavContext, type NavState } from "./nav";
 import { BoardScreen, ChatScreen, LinksScreen, MessageScreen, PushScreen } from "./screens/Ai";
-import { CustomerScreen, CustomersScreen, GuestSkinScreen, NoteScreen, RegisterScreen, SkinDiagScreen } from "./screens/Customers";
+import { CustomerScreen, CustomersScreen, GuestSkinScreen, NoteScreen, RegisterScreen, SkinDiagScreen, StoppedScreen } from "./screens/Customers";
 import { HomeScreen } from "./screens/Home";
+import { PerfGroupScreen, PerfMineScreen, PerfScreen } from "./screens/Perf";
 import { LoginScreen, MfaScreen } from "./screens/Login";
 import {
   AttendanceScreen,
@@ -40,6 +41,7 @@ import {
 } from "./screens/Status";
 import {
   CollectionScreen,
+  OrderLookupScreen,
   OrderScreen,
   PromoScreen,
   SalesScreen,
@@ -49,25 +51,24 @@ import {
 } from "./screens/Work";
 import type { MessageType, ScreenId } from "./types";
 
-const tabs: { id: ScreenId; label: string; icon: typeof IconHome; office?: boolean }[] = [
+type TabDef = { id: ScreenId; label: string; icon: typeof IconBox; office?: boolean };
+
+const tabs: TabDef[] = [
   { id: "home", label: "홈", icon: IconHome },
   { id: "customers", label: "고객", icon: IconUsers },
   { id: "mypage", label: "마이오피스", icon: IconUser, office: true },
-  { id: "work", label: "주문", icon: IconBox },
+  { id: "work", label: "주문/입금", icon: IconBox },
   { id: "trade", label: "판매/수금", icon: IconWon },
 ];
-
-const tabScreens = new Set<ScreenId>(["home", "customers", "work", "trade", "mypage"]);
 
 function isAuthed(screen: ScreenId) {
   return screen !== "login" && screen !== "mfa";
 }
 
 function activeTabOf(screen: ScreenId): ScreenId {
-  if (screen === "customer" || screen === "message" || screen === "skindiag" || screen === "guestskin" || screen === "note" || screen === "register") return "customers";
-  if (tabScreens.has(screen)) return screen;
-  if (["promo", "order", "stock"].includes(screen)) return "work";
-  if (["slips", "sales", "collection"].includes(screen)) return "trade";
+  if (screen === "customer" || screen === "message" || screen === "skindiag" || screen === "guestskin" || screen === "note" || screen === "register" || screen === "stopped") return "customers";
+  if (["promo", "order", "orderLookup", "stock", "deposit"].includes(screen)) return "work";
+  if (["trade", "slips", "sales", "collection"].includes(screen)) return "trade";
   if (
     [
       "status",
@@ -79,7 +80,6 @@ function activeTabOf(screen: ScreenId): ScreenId {
       "attendance",
       "rank",
       "profile",
-      "deposit",
       "incentive",
       "editshop",
       "live",
@@ -88,10 +88,14 @@ function activeTabOf(screen: ScreenId): ScreenId {
       "links",
       "board",
       "push",
+      "perf",
+      "perfMine",
+      "perfGroup",
     ].includes(screen)
   ) {
     return "mypage";
   }
+  if (tabs.some((t) => t.id === screen)) return screen;
   return "home";
 }
 
@@ -105,6 +109,8 @@ function ScreenInner({ screen }: { screen: ScreenId }) {
       return <HomeScreen />;
     case "customers":
       return <CustomersScreen />;
+    case "stopped":
+      return <StoppedScreen />;
     case "customer":
       return <CustomerScreen />;
     case "message":
@@ -127,10 +133,18 @@ function ScreenInner({ screen }: { screen: ScreenId }) {
       return <PushScreen />;
     case "work":
       return <WorkScreen />;
+    case "perf":
+      return <PerfScreen />;
+    case "perfMine":
+      return <PerfMineScreen />;
+    case "perfGroup":
+      return <PerfGroupScreen />;
     case "promo":
       return <PromoScreen />;
     case "order":
       return <OrderScreen />;
+    case "orderLookup":
+      return <OrderLookupScreen />;
     case "trade":
       return <TradeScreen />;
     case "slips":
@@ -264,8 +278,19 @@ export default function App() {
             <div>
               <h1>IRIS 3.0 로컬 프로토타입</h1>
               <p>기획 검증용입니다. 왼쪽 메뉴를 누르거나 폰 화면을 직접 조작하세요.</p>
+              <p className="share-url">
+                공유 주소{" "}
+                <a href="http://PAP55003398NO03:5173/" target="_blank" rel="noreferrer">
+                  http://PAP55003398NO03:5173/
+                </a>
+              </p>
             </div>
-            <div className="stage-note">{screenNotes[state.screen]}</div>
+            <div className="stage-head-aside">
+              <button className="ia-export" type="button" onClick={downloadIaExcel}>
+                메뉴구조도 엑셀
+              </button>
+              <div className="stage-note">{screenNotes[state.screen]}</div>
+            </div>
           </div>
           <div className="phone-wrap">
             <div className="phone">
@@ -319,12 +344,6 @@ export default function App() {
                         >
                           {state.checkedIn ? <IconCheck width={20} height={20} /> : <IconCalendar width={20} height={20} />}
                           <span>{state.checkedIn ? "완료" : "출근"}</span>
-                        </button>
-                      ) : null}
-                      {state.screen !== "note" ? (
-                        <button className="fab-note" type="button" onClick={() => api.go("note")} aria-label="상담">
-                          <IconEdit width={18} height={18} />
-                          <span>상담</span>
                         </button>
                       ) : null}
                       {state.screen !== "chat" ? (

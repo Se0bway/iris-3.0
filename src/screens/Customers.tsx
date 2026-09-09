@@ -440,6 +440,7 @@ export function CustomersScreen() {
     const bdayM = Number(ym.slice(5, 7));
     return customers
       .filter((c) => {
+        if (c.stopped) return false;
         const hit =
           !q ||
           c.name.includes(q) ||
@@ -479,9 +480,14 @@ export function CustomersScreen() {
       <AppHeader />
       <div className="home-title" style={{ paddingBottom: 8 }}>
         <h3>고객</h3>
-        <button className="reg-entry" type="button" onClick={() => nav.go("register", { name: "", phone: "" })}>
-          신규 등록
-        </button>
+        <div className="title-tools">
+          <button className="stopped-link" type="button" onClick={() => nav.go("stopped")}>
+            중지고객 보기
+          </button>
+          <button className="reg-entry" type="button" onClick={() => nav.go("register", { name: "", phone: "" })}>
+            신규 등록
+          </button>
+        </div>
       </div>
       <div className="search cust-search">
         <IconSearch />
@@ -544,7 +550,10 @@ export function CustomersScreen() {
             <span className="who">이름</span>
             <span className="cust-type">{chipHead(seg)}</span>
           </div>
-          {list.map((c) => (
+          {list.length === 0 ? (
+            <p className="empty">고객이 없습니다.</p>
+          ) : (
+            list.map((c) => (
             <div key={c.id} className="cust-row">
               <button className="cust-main" type="button" onClick={() => nav.go("customer", { customerId: c.id })}>
                 <span className="cust-no">{custNo(c.id)}</span>
@@ -560,7 +569,71 @@ export function CustomersScreen() {
                 <IconChevron width={14} height={14} />
               </button>
             </div>
-          ))}
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function StoppedScreen() {
+  const nav = useNav();
+  const { list: customers } = useConsults();
+  const [q, setQ] = useState("");
+
+  const list = useMemo(() => {
+    return customers.filter((c) => {
+      if (!c.stopped) return false;
+      return (
+        !q ||
+        c.name.includes(q) ||
+        c.phone.replace(/-/g, "").includes(q.replace(/-/g, "")) ||
+        String(custNo(c.id)).includes(q.replace(/\D/g, "") || q)
+      );
+    });
+  }, [q, customers]);
+
+  return (
+    <div className="app-scroll">
+      <TopBar title="중지고객" onBack={() => nav.go("customers")} />
+      <div className="search cust-search">
+        <IconSearch />
+        <input
+          placeholder="고객명, 고객번호, 연락처"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
+      <div className="pad cust-count">{list.length}명</div>
+      <div className="pad">
+        <div className="card list-card cust-list">
+          <div className="cust-head">
+            <span className="cust-no">번호</span>
+            <span className="who">이름</span>
+            <span className="cust-type">연락처</span>
+          </div>
+          {list.length === 0 ? (
+            <p className="empty">중지 고객이 없습니다.</p>
+          ) : (
+            list.map((c) => (
+              <div key={c.id} className="cust-row">
+                <button className="cust-main" type="button" onClick={() => nav.go("customer", { customerId: c.id })}>
+                  <span className="cust-no">{custNo(c.id)}</span>
+                  <span className="who">
+                    <span className="name-row">
+                      <b>{c.name}</b>
+                      <i className="cust-kind">{shortType(c)}</i>
+                    </span>
+                  </span>
+                </button>
+                <button className="cust-metric" type="button" onClick={() => nav.go("customer", { customerId: c.id })}>
+                  <span className="cust-metric-txt">{c.phone}</span>
+                  <IconChevron width={14} height={14} />
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -569,10 +642,11 @@ export function CustomersScreen() {
 
 export function CustomerScreen() {
   const nav = useNav();
-  const { notesOf, list } = useConsults();
+  const { notesOf, list, setStopped } = useConsults();
   const c = list.find((x) => x.id === nav.customerId) ?? list[0];
   const notes = [...notesOf(c.id)].sort((a, b) => noteTime(b.date).localeCompare(noteTime(a.date)));
   const [tab, setTab] = useState<"profile" | "buy" | "consult" | "point">("profile");
+  const [confirmStop, setConfirmStop] = useState(false);
   const birthMd = c.birth.slice(5).replace("-", "/");
   const lastSale = [...c.ledger]
     .filter((r) => r.type === "sale")
@@ -656,6 +730,46 @@ export function CustomerScreen() {
             AI 추천 메세지
           </button>
         </div>
+      </div>
+
+      <div className="cd-life">
+        {c.stopped ? (
+          <button
+            className="btn outline"
+            type="button"
+            onClick={() => {
+              setStopped(c.id, false);
+              nav.setToast("정상 고객으로 변경했습니다");
+              nav.go("stopped");
+            }}
+          >
+            정상으로 변경
+          </button>
+        ) : confirmStop ? (
+          <div className="cd-life-ask">
+            <p>이 고객을 중지할까요?</p>
+            <div className="cd-life-ask-btns">
+              <button className="btn ghost" type="button" onClick={() => setConfirmStop(false)}>
+                취소
+              </button>
+              <button
+                className="btn primary"
+                type="button"
+                onClick={() => {
+                  setStopped(c.id, true);
+                  nav.setToast("고객을 중지했습니다");
+                  nav.go("customers");
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn ghost" type="button" onClick={() => setConfirmStop(true)}>
+            고객 중지
+          </button>
+        )}
       </div>
 
       <div className="cd-tabs">
@@ -1008,7 +1122,7 @@ export function NoteScreen() {
 
   const picked = customers.find((c) => c.id === pickedId) ?? null;
   const list = customers.filter(
-    (c) => !q || c.name.includes(q) || c.phone.replace(/-/g, "").includes(q.replace(/-/g, ""))
+    (c) => !c.stopped && (!q || c.name.includes(q) || c.phone.replace(/-/g, "").includes(q.replace(/-/g, "")))
   );
 
   const save = () => {
