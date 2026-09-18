@@ -18,7 +18,11 @@ export type ScreenId =
   | "order"
   | "orderLookup"
   | "trade"
+  | "tradeHistory"
   | "slips"
+  | "cancelledSlips"
+  | "ledger"
+  | "saleHistory"
   | "sales"
   | "collection"
   | "status"
@@ -40,7 +44,8 @@ export type ScreenId =
   | "skindiag"
   | "guestskin"
   | "note"
-  | "register";
+  | "register"
+  | "pointGift";
 
 export type Segment =
   | "new"
@@ -195,4 +200,14 @@ export interface NavItem {
   id: ScreenId;
   label: string;
   children?: NavItem[];
+}
+
+export type ProductOrderStatus = "미확정" | "확정";
+
+export interface ProductOrder {
+  id: string;
+  no: string;
+  date: string;
+  status: ProductOrderStatus;
+  items: { productId: string; qty: number }[];
 }

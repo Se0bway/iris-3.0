@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { closing, counselor, deposits, hqEducations, members, products, productSalesBase, RANKS, vaAccount } from "../data";
 import { krw } from "../lib";
 import { useNav } from "../nav";
+import { useConsults } from "../consult";
 import { MonthBar, PerfTable, usePerfMonth } from "./Perf";
 import { AppHeader, TopBar } from "../ui";
 import { IconChevron, IconCrown, IconSearch } from "../icons";
@@ -32,6 +33,18 @@ function CardHead({ title }: { title: string }) {
   );
 }
 
+function AttendanceCheck() {
+  const nav = useNav();
+  if (nav.checkedIn) {
+    return <div className="done-tag">오늘 출근이 등록되었습니다</div>;
+  }
+  return (
+    <button className="btn primary" type="button" onClick={nav.checkIn}>
+      출근 체크
+    </button>
+  );
+}
+
 const eduLabel = {
   required: "필수",
   done: "수료",
@@ -46,6 +59,7 @@ const eduTone = {
 
 export function MyPageScreen() {
   const nav = useNav();
+  const { counselorPoints } = useConsults();
   const dueEdu = hqEducations.filter((e) => e.status !== "done");
 
   return (
@@ -128,19 +142,34 @@ export function MyPageScreen() {
           </div>
         </div>
 
-        <button className="mp-card" type="button" onClick={() => nav.go("attendance")}>
-          <CardHead title="출근 현황" />
-          <div className="mp-metrics">
+        <button className="mp-card" type="button" onClick={() => nav.go("pointGift", { customerId: "self" })}>
+          <CardHead title="내 뷰티포인트" />
+          <div className="mp-metrics one">
             <div className="mp-metric">
-              <div className="l">이번 달 출근일 수</div>
-              <div className="v">{attendDays + (nav.checkedIn ? 1 : 0)}일</div>
-            </div>
-            <div className="mp-metric">
-              <div className="l">오늘</div>
-              <div className="v">{nav.checkedIn ? "출근완료!" : "미출근"}</div>
+              <div className="l">보유 포인트</div>
+              <div className="v">{counselorPoints.toLocaleString("ko-KR")}P</div>
             </div>
           </div>
         </button>
+
+        <div className="mp-card">
+          <button className="mp-card-go" type="button" onClick={() => nav.go("attendance")}>
+            <CardHead title="출근 현황" />
+            <div className="mp-metrics">
+              <div className="mp-metric">
+                <div className="l">이번 달 출근일 수</div>
+                <div className="v">{attendDays + (nav.checkedIn ? 1 : 0)}일</div>
+              </div>
+              <div className="mp-metric">
+                <div className="l">오늘</div>
+                <div className="v">{nav.checkedIn ? "출근완료!" : "미출근"}</div>
+              </div>
+            </div>
+          </button>
+          <div className="mp-attend-act">
+            <AttendanceCheck />
+          </div>
+        </div>
 
         <button className="mp-card" type="button" onClick={() => nav.go("live")}>
           <CardHead title="라이브 영상 시청횟수" />
@@ -395,13 +424,7 @@ export function AttendanceScreen() {
           <div className="big-num" style={{ margin: "8px 0", fontSize: 22 }}>
             {nav.checkedIn ? "출근완료!" : "오늘 미출근"}
           </div>
-          {nav.checkedIn ? (
-            <div className="done-tag">오늘 출근이 등록되었습니다</div>
-          ) : (
-            <button className="btn primary" type="button" onClick={nav.checkIn}>
-              출근 등록
-            </button>
-          )}
+          <AttendanceCheck />
         </div>
         <div className="card" style={{ padding: 12 }}>
           <div className="cal">

@@ -1,43 +1,46 @@
 import * as XLSX from "xlsx";
-import { screenNotes } from "./data";
-import { iaTree, screenCatalog, type IaNode } from "./ia";
+import { iaTree, type IaNode } from "./ia";
 
-export interface IaRow {
-  번호: string;
-  레벨: number;
-  대분류: string;
-  중분류: string;
-  소분류: string;
-  세부분류: string;
-  메뉴명: string;
-  유형: string;
-  ScreenId: string;
-  설명: string;
-  진입경로: string;
-  비고: string;
-}
+const headers = [
+  "기존/신규",
+  "L1",
+  "L1명",
+  "L2",
+  "L2명",
+  "L3",
+  "L3명",
+  "설명",
+  "협의 필요 부서",
+  "카운셀러 질의응답",
+  "기능 특이사항",
+  "비고",
+  "작성 일정",
+] as const;
 
-function flattenIa(nodes: IaNode[], ancestors: string[] = [], prefix = ""): IaRow[] {
-  const rows: IaRow[] = [];
-  nodes.forEach((node, i) => {
-    const num = prefix ? `${prefix}.${i + 1}` : `${i + 1}`;
+type Header = (typeof headers)[number];
+export type ReqRow = Record<Header, string>;
+
+function flattenIa(nodes: IaNode[], ancestors: string[] = []): ReqRow[] {
+  const rows: ReqRow[] = [];
+  nodes.forEach((node) => {
     const path = [...ancestors, node.label];
     rows.push({
-      번호: num,
-      레벨: path.length,
-      대분류: path[0] ?? "",
-      중분류: path[1] ?? "",
-      소분류: path[2] ?? "",
-      세부분류: path[3] ?? "",
-      메뉴명: node.label,
-      유형: node.type,
-      ScreenId: node.screenId ?? "",
+      "기존/신규": "",
+      L1: "",
+      L1명: path[0] ?? "",
+      L2: "",
+      L2명: path[1] ?? "",
+      L3: "",
+      L3명: path.length >= 3 ? node.label : "",
       설명: node.desc,
-      진입경로: node.entry ?? "",
+      "협의 필요 부서": "",
+      "카운셀러 질의응답": "",
+      "기능 특이사항": "",
       비고: node.note ?? "",
+      "작성 일정": "",
     });
     if (node.children?.length) {
-      rows.push(...flattenIa(node.children, path, num));
+      rows.push(...flattenIa(node.children, path));
     }
   });
   return rows;
@@ -51,49 +54,19 @@ function todayStamp() {
   return `${y}-${m}-${day}`;
 }
 
-function autoWidth(rows: object[], headers: string[]) {
+function autoWidth(rows: ReqRow[]) {
   return headers.map((key) => {
-    const max = rows.reduce((n, row) => {
-      const v = String((row as Record<string, unknown>)[key] ?? "");
-      return Math.max(n, v.length);
-    }, key.length);
+    const max = rows.reduce((n, row) => Math.max(n, row[key].length), key.length);
     return { wch: Math.min(Math.max(max + 2, 10), 56) };
   });
 }
 
 export function downloadIaExcel() {
-  const menuRows = flattenIa(iaTree);
-  const screenRows = screenCatalog.map((s) => ({
-    ScreenId: s.screenId,
-    화면명: s.name,
-    소속대메뉴: s.group,
-    설명: screenNotes[s.screenId] ?? "",
-    주요진입점: s.entry,
-  }));
-
-  const menuHeaders = [
-    "번호",
-    "레벨",
-    "대분류",
-    "중분류",
-    "소분류",
-    "세부분류",
-    "메뉴명",
-    "유형",
-    "ScreenId",
-    "설명",
-    "진입경로",
-    "비고",
-  ];
-  const screenHeaders = ["ScreenId", "화면명", "소속대메뉴", "설명", "주요진입점"];
-
-  const menuSheet = XLSX.utils.json_to_sheet(menuRows, { header: menuHeaders });
-  const screenSheet = XLSX.utils.json_to_sheet(screenRows, { header: screenHeaders });
-  menuSheet["!cols"] = autoWidth(menuRows, menuHeaders);
-  screenSheet["!cols"] = autoWidth(screenRows, screenHeaders);
+  const rows = flattenIa(iaTree);
+  const sheet = XLSX.utils.json_to_sheet(rows, { header: [...headers] });
+  sheet["!cols"] = autoWidth(rows);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, menuSheet, "메뉴구조도");
-  XLSX.utils.book_append_sheet(wb, screenSheet, "화면목록");
-  XLSX.writeFile(wb, `IRIS3.0_메뉴구조도_${todayStamp()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, sheet, "요구사항 정의");
+  XLSX.writeFile(wb, `IRIS3.0_기능요건정리_${todayStamp()}.xlsx`);
 }

@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
-import { TODAY, closing, counselor, productOrders, products, promos } from "../data";
+import { useMemo, useRef, useState } from "react";
+import { TODAY, closing, counselor, products, promos } from "../data";
 import { custNo, krw } from "../lib";
 import { useNav } from "../nav";
 import { useConsults } from "../consult";
-import { IconBack, IconChevron, IconDown, IconSearch } from "../icons";
+import { IconBack, IconChevron, IconDown, IconMenu, IconSearch } from "../icons";
 import { AppHeader, TopBar } from "../ui";
-import type { Customer, LedgerRow, ScreenId } from "../types";
+import type { Customer, LedgerLine, LedgerRow, ScreenId } from "../types";
 
 const stockQty = products.reduce((s, p) => s + p.stock, 0);
 const stockAmt = products.reduce((s, p) => s + p.stock * p.price, 0);
@@ -21,7 +21,7 @@ export function WorkScreen() {
   const used = counselor.creditLimit - counselor.creditRemain;
   const items: { id: ScreenId; n: string; title: string; desc: string }[] = [
     { id: "order", n: "1", title: "본품 주문", desc: "재고 확인 후 발주" },
-    { id: "orderLookup", n: "2", title: "주문조회", desc: "발주한 상품 · 입고 상태" },
+    { id: "orderLookup", n: "2", title: "주문조회", desc: "발주한 상품 · 확정 상태" },
     { id: "stock", n: "3", title: "재고조회", desc: "본인 재고 수량 · 가격합계" },
     { id: "deposit", n: "4", title: "가상계좌 입금내역", desc: "처리구분 · 상세보기 · 등록요청" },
   ];
@@ -112,9 +112,37 @@ export function TradeScreen() {
       <div className="pad">
         <div className="card list-card">
           {[
-            { id: "slips" as const, n: "1", title: "전표조회", desc: "고객별 판매 · 수금 전표" },
-            { id: "sales" as const, n: "2", title: "판매", desc: "본인 재고에서 상품 판매" },
-            { id: "collection" as const, n: "3", title: "수금", desc: "현금 · 카드 수금 등록" },
+            { id: "tradeHistory" as const, n: "1", title: "판매/수금 내역", desc: "고객원장 · 전표조회 · 취소전표조회" },
+            { id: "saleHistory" as const, n: "2", title: "판매이력", desc: "상품별 · 고객별 판매수량 · 판매금액" },
+            { id: "sales" as const, n: "3", title: "판매", desc: "본인 재고에서 상품 판매" },
+            { id: "collection" as const, n: "4", title: "수금", desc: "현금 · 카드 수금 등록" },
+          ].map((it) => (
+            <button key={it.id} className="row" type="button" onClick={() => nav.go(it.id)}>
+              <div className="avatar">{it.n}</div>
+              <div className="meta">
+                <b>{it.title}</b>
+                <p>{it.desc}</p>
+              </div>
+              <IconChevron />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TradeHistoryScreen() {
+  const nav = useNav();
+  return (
+    <div className="app-scroll">
+      <TopBar title="판매/수금 내역" onBack={nav.back} />
+      <div className="pad">
+        <div className="card list-card">
+          {[
+            { id: "ledger" as const, n: "1", title: "고객원장", desc: "일별 판매 · 수금 활동" },
+            { id: "slips" as const, n: "2", title: "전표조회", desc: "고객별 판매 · 수금 전표" },
+            { id: "cancelledSlips" as const, n: "3", title: "취소전표조회", desc: "취소된 판매 · 수금 전표" },
           ].map((it) => (
             <button key={it.id} className="row" type="button" onClick={() => nav.go(it.id)}>
               <div className="avatar">{it.n}</div>
@@ -132,41 +160,11 @@ export function TradeScreen() {
 }
 
 export function SlipsScreen() {
-  const nav = useNav();
-  const [kind, setKind] = useState<"slips" | "cancelled" | null>(null);
+  return <TradeFlow kind="slips" title="전표조회" />;
+}
 
-  if (!kind) {
-    return (
-      <div className="app-scroll">
-        <TopBar title="전표조회" onBack={nav.back} />
-        <div className="pad">
-          <div className="card list-card">
-            {[
-              { id: "slips" as const, n: "1", title: "전표조회", desc: "판매 · 수금 전표" },
-              { id: "cancelled" as const, n: "2", title: "취소전표 조회", desc: "취소된 판매 · 수금 전표" },
-            ].map((it) => (
-              <button key={it.id} className="row" type="button" onClick={() => setKind(it.id)}>
-                <div className="avatar">{it.n}</div>
-                <div className="meta">
-                  <b>{it.title}</b>
-                  <p>{it.desc}</p>
-                </div>
-                <IconChevron />
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <TradeFlow
-      kind={kind}
-      title={kind === "cancelled" ? "취소전표 조회" : "전표조회"}
-      onExit={() => setKind(null)}
-    />
-  );
+export function CancelledSlipsScreen() {
+  return <TradeFlow kind="cancelled" title="취소전표조회" />;
 }
 
 export function SalesScreen() {
@@ -175,6 +173,484 @@ export function SalesScreen() {
 
 export function CollectionScreen() {
   return <TradeFlow kind="collection" title="수금" />;
+}
+
+function HistRange({
+  from,
+  to,
+  onFrom,
+  onTo,
+  onApply,
+}: {
+  from: string;
+  to: string;
+  onFrom: (v: string) => void;
+  onTo: (v: string) => void;
+  onApply: () => void;
+}) {
+  return (
+    <div className="ld-range">
+      <input type="date" value={from} onChange={(e) => onFrom(e.target.value)} />
+      <span>—</span>
+      <input type="date" value={to} onChange={(e) => onTo(e.target.value)} />
+      <button className="fill" type="button" onClick={onApply}>
+        조회
+      </button>
+    </div>
+  );
+}
+
+export function SaleHistoryScreen() {
+  const nav = useNav();
+  const { list } = useConsults();
+  const defaultFrom = shiftMonth(TODAY, -1);
+  const [tab, setTab] = useState<"product" | "customer">("product");
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(TODAY);
+  const [applied, setApplied] = useState({ from: defaultFrom, to: TODAY });
+  const [q, setQ] = useState("");
+  const [pickedProduct, setPickedProduct] = useState<string | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [slip, setSlip] = useState<LedgerRow | null>(null);
+
+  const clearDrill = () => {
+    setPickedProduct(null);
+    setPickedId(null);
+    setSlip(null);
+  };
+
+  const productRows = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        code: string;
+        name: string;
+        qty: number;
+        amount: number;
+        buyers: { id: string; name: string; qty: number; amount: number }[];
+      }
+    >();
+    for (const c of list) {
+      if (c.stopped) continue;
+      for (const r of c.ledger) {
+        if (r.type !== "sale" || r.status === "취소" || r.date < applied.from || r.date > applied.to) continue;
+        for (const line of slipLines(r)) {
+          const key = `${line.code}|${line.name}`;
+          const cur = map.get(key) ?? { key, code: line.code, name: line.name, qty: 0, amount: 0, buyers: [] };
+          cur.qty += line.qty;
+          cur.amount += line.amount;
+          const buyer = cur.buyers.find((b) => b.id === c.id);
+          if (buyer) {
+            buyer.qty += line.qty;
+            buyer.amount += line.amount;
+          } else {
+            cur.buyers.push({ id: c.id, name: c.name, qty: line.qty, amount: line.amount });
+          }
+          map.set(key, cur);
+        }
+      }
+    }
+    return [...map.values()].sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+  }, [list, applied]);
+
+  const customerRows = useMemo(() => {
+    const key = q.replace(/-/g, "");
+    return list
+      .filter((c) => !c.stopped)
+      .map((c) => {
+        const sales = c.ledger.filter(
+          (r) => r.type === "sale" && r.status !== "취소" && r.date >= applied.from && r.date <= applied.to
+        );
+        if (!sales.length) return null;
+        const items = sales.flatMap((r) => slipLines(r).map((line) => ({ row: r, line })));
+        const qty = items.reduce((s, x) => s + x.line.qty, 0);
+        const amount = items.reduce((s, x) => s + x.line.amount, 0);
+        const last = [...sales.map((r) => r.date)].sort().at(-1) ?? "";
+        return { c, qty, amount, last, items };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null)
+      .filter((x) => !q || x.c.name.includes(q) || x.c.phone.replace(/-/g, "").includes(key))
+      .sort((a, b) => b.amount - a.amount);
+  }, [list, applied, q]);
+
+  const productFiltered = productRows.filter((p) => !q || p.name.includes(q) || p.code.includes(q));
+  const productDetail = productRows.find((p) => p.key === pickedProduct) ?? null;
+  const customerDetail = customerRows.find((x) => x.c.id === pickedId) ?? null;
+
+  if (slip && customerDetail) {
+    return <SlipDetail customer={customerDetail.c} row={slip} onBack={() => setSlip(null)} />;
+  }
+
+  if (productDetail) {
+    const buyers = [...productDetail.buyers].sort((a, b) => b.amount - a.amount);
+    return (
+      <div className="app-scroll">
+        <TopBar title="판매이력" onBack={() => setPickedProduct(null)} />
+        <p className="ld-note">
+          {productDetail.code} {productDetail.name} · {productDetail.qty}개 · {krw(productDetail.amount)}
+        </p>
+        {buyers.length === 0 ? (
+          <p className="empty" style={{ padding: 12 }}>
+            구매 고객이 없습니다.
+          </p>
+        ) : (
+          buyers.map((b) => (
+            <button
+              className="sh-row"
+              key={b.id}
+              type="button"
+              onClick={() => nav.go("ledger", { customerId: b.id })}
+            >
+              <p>{b.name}</p>
+              <span>
+                {b.qty}개 · {krw(b.amount)}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  if (customerDetail) {
+    return (
+      <div className="app-scroll">
+        <TopBar title={customerDetail.c.name} onBack={() => setPickedId(null)} />
+        <p className="ld-note">
+          {customerDetail.last} · {customerDetail.qty}개 · {krw(customerDetail.amount)} · 미수{" "}
+          {customerDetail.c.unpaid ? krw(customerDetail.c.unpaid) : "없음"}
+        </p>
+        {customerDetail.items.map((x, i) => (
+          <button className="sh-row" key={`${x.row.id}-${i}`} type="button" onClick={() => setSlip(x.row)}>
+            <p>
+              {x.line.code} {x.line.name}
+            </p>
+            <span>
+              {x.row.date} · {x.line.qty}개 · {krw(x.line.amount)}
+            </span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-scroll">
+      <TopBar title="판매이력" onBack={nav.back} />
+      <HistRange
+        from={from}
+        to={to}
+        onFrom={setFrom}
+        onTo={setTo}
+        onApply={() => {
+          setApplied({ from, to });
+          clearDrill();
+        }}
+      />
+      <div className="perf-tabs cols-2">
+        <button className={tab === "product" ? "on" : ""} type="button" onClick={() => { setTab("product"); clearDrill(); setQ(""); }}>
+          상품별
+        </button>
+        <button className={tab === "customer" ? "on" : ""} type="button" onClick={() => { setTab("customer"); clearDrill(); setQ(""); }}>
+          고객별
+        </button>
+      </div>
+      <div className="search">
+        <IconSearch />
+        <input
+          placeholder={tab === "product" ? "상품명, 코드" : "고객명, 연락처"}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
+      {tab === "product" ? (
+        productFiltered.length === 0 ? (
+          <p className="empty" style={{ padding: 12 }}>
+            해당 기간 판매이력이 없습니다.
+          </p>
+        ) : (
+          productFiltered.map((p) => (
+            <button className="sh-row" key={p.key} type="button" onClick={() => setPickedProduct(p.key)}>
+              <p>
+                {p.code} {p.name}
+              </p>
+              <span>
+                {p.qty}개 · {krw(p.amount)}
+              </span>
+            </button>
+          ))
+        )
+      ) : customerRows.length === 0 ? (
+        <p className="empty" style={{ padding: 12 }}>
+          해당 기간 판매이력이 없습니다.
+        </p>
+      ) : (
+        customerRows.map((x) => (
+          <button className="sh-row" key={x.c.id} type="button" onClick={() => setPickedId(x.c.id)}>
+            <p>
+              {x.c.name}
+              <em className="sh-date">{x.last}</em>
+            </p>
+            <span>
+              {x.qty}개 · {krw(x.amount)} · 미수 {x.c.unpaid ? krw(x.c.unpaid) : "없음"}
+            </span>
+          </button>
+        ))
+      )}
+    </div>
+  );
+}
+
+function shiftMonth(iso: string, months: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1 + months, d);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+type DayProd = { row: LedgerRow; line: LedgerLine; key: string };
+type DayGroup = {
+  date: string;
+  rows: LedgerRow[];
+  qty: number;
+  saleAmt: number;
+  coupon: number;
+  points: number;
+  collected: number;
+  products: DayProd[];
+};
+
+function groupLedgerDays(c: Customer, from: string, to: string): DayGroup[] {
+  const live = c.ledger.filter((r) => r.status !== "취소" && r.date >= from && r.date <= to);
+  const dates = [...new Set(live.map((r) => r.date))].sort((a, b) => b.localeCompare(a));
+  return dates.map((date) => {
+    const rows = live.filter((r) => r.date === date);
+    const sales = rows.filter((r) => r.type === "sale");
+    const collects = rows.filter((r) => r.type === "collect");
+    const products: DayProd[] = [];
+    for (const r of sales) {
+      slipLines(r).forEach((line, i) => products.push({ row: r, line, key: `${r.id}-${i}` }));
+    }
+    return {
+      date,
+      rows,
+      qty: products.reduce((s, p) => s + p.line.qty, 0),
+      saleAmt: products.reduce((s, p) => s + p.line.amount, 0),
+      coupon: sales.reduce((s, r) => s + (r.coupon ?? 0), 0),
+      points: sales.reduce((s, r) => s + (r.pointsEarn ?? 0) + (r.pointsUse ?? 0), 0),
+      collected: collects.reduce((s, r) => s + r.amount, 0),
+      products,
+    };
+  });
+}
+
+export function LedgerScreen() {
+  const nav = useNav();
+  const last = nav.stack[nav.stack.length - 1];
+  const keepCustomer = last === "customer" || last === "saleHistory";
+  const [pickedId, setPickedId] = useState<string | null>(() => (keepCustomer ? nav.customerId : null));
+
+  if (!pickedId) {
+    return <CustomerPick title="고객원장" onPick={setPickedId} onBack={nav.back} />;
+  }
+
+  return (
+    <LedgerPage
+      customerId={pickedId}
+      onBack={keepCustomer ? nav.back : () => setPickedId(null)}
+    />
+  );
+}
+
+function LedgerPage({ customerId, onBack }: { customerId: string; onBack: () => void }) {
+  const nav = useNav();
+  const c = useCustomer(customerId);
+  const defaultFrom = shiftMonth(TODAY, -1);
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(TODAY);
+  const [applied, setApplied] = useState({ from: defaultFrom, to: TODAY });
+  const [shown, setShown] = useState(2);
+  const [shareDate, setShareDate] = useState<string | null>(null);
+  const [slip, setSlip] = useState<LedgerRow | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const days = useMemo(() => groupLedgerDays(c, applied.from, applied.to), [c, applied]);
+  const visible = days.slice(0, shown);
+  const shareDay = days.find((d) => d.date === shareDate) ?? null;
+
+  if (slip) {
+    return <SlipDetail customer={c} row={slip} onBack={() => setSlip(null)} />;
+  }
+
+  const openDaySlip = (day: DayGroup, row?: LedgerRow) => {
+    const hit = row ?? day.rows.find((r) => r.type === "sale") ?? day.rows[0];
+    if (hit) setSlip(hit);
+  };
+
+  const shareText = shareDay
+    ? `[IRIS] ${c.name} 고객님 ${shareDay.date} 원장\n판매수량 ${shareDay.qty}개 · 판매금액 ${krw(shareDay.saleAmt)}\n수금 ${krw(shareDay.collected)} · 미수 ${c.unpaid ? krw(c.unpaid) : "없음"}`
+    : "";
+
+  return (
+    <div className="app-scroll" ref={scroller}>
+      <TopBar
+        title="고객원장"
+        onBack={onBack}
+        right={
+          <button className="icon-btn" type="button" aria-label="메뉴" onClick={() => nav.setToast("고객원장 메뉴")}>
+            <IconMenu width={20} height={20} />
+          </button>
+        }
+      />
+      <div className="ld-metrics">
+        <div>
+          <span>뷰티포인트</span>
+          <b>{c.beautyPoints.toLocaleString("ko-KR")}</b>
+        </div>
+        <div>
+          <span>미수금</span>
+          <b>{c.unpaid ? c.unpaid.toLocaleString("ko-KR") : "0"}</b>
+        </div>
+      </div>
+      <div className="ld-acts">
+        <button className="fill" type="button" onClick={() => nav.go("note", { customerId: c.id })}>
+          메모등록
+        </button>
+        <button className="line" type="button" onClick={() => nav.go("slips", { customerId: c.id })}>
+          전표조회
+        </button>
+      </div>
+      <div className="ld-range">
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <span>—</span>
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <button
+          className="fill"
+          type="button"
+          onClick={() => {
+            setApplied({ from, to });
+            setShown(2);
+          }}
+        >
+          조회
+        </button>
+      </div>
+      <p className="ld-note">
+        ※ 일별 원장에는 5년 이상 무거래 고객의 미수금액이 노출되지 않으므로, 화면 오른쪽 상단의 &apos;미수금&apos; 확인 바랍니다.
+      </p>
+      {visible.length === 0 ? <p className="empty" style={{ padding: "12px" }}>해당 기간 원장이 없습니다.</p> : null}
+      {visible.map((day) => (
+        <section className="ld-day" key={day.date}>
+          <div className="ld-day-h">
+            <b>{day.date}</b>
+            <button className="ld-share" type="button" onClick={() => setShareDate(day.date)}>
+              공유하기
+            </button>
+          </div>
+          <div className="ld-sec">판매상품 목록</div>
+          <button className="ld-sum" type="button" onClick={() => openDaySlip(day)}>
+            <span className="ld-sum-l">합계</span>
+            <span className="ld-sum-r">
+              <span>
+                판매수량 <b>{day.qty}개</b>
+              </span>
+              <span>
+                판매금액 <b>{krw(day.saleAmt)}</b>
+              </span>
+              <span>
+                쿠폰 할인 <b>{krw(day.coupon)}</b>
+              </span>
+              <span>
+                포인트 <b>{day.points.toLocaleString("ko-KR")}P</b>
+              </span>
+              <span>
+                수금금액 <b>{krw(day.collected)}</b>
+              </span>
+              <span>
+                미수금액 <b>{c.unpaid ? krw(c.unpaid) : "0원"}</b>
+              </span>
+            </span>
+          </button>
+          {day.products.map((p) => (
+            <button className="ld-prod" key={p.key} type="button" onClick={() => openDaySlip(day, p.row)}>
+              <p>
+                {p.line.code} {p.line.name}
+              </p>
+              <span>
+                가격 {krw(Math.abs(p.line.amount))} · 수량 {p.line.qty}개
+              </span>
+            </button>
+          ))}
+        </section>
+      ))}
+      {days.length > 0 ? (
+        <div className="ld-foot">
+          {shown < days.length ? (
+            <button
+              className="ld-more"
+              type="button"
+              onClick={() => setShown((n) => Math.min(n + 2, days.length))}
+            >
+              더보기 {Math.min(shown, days.length)}/{days.length}
+            </button>
+          ) : (
+            <p className="ld-more">더보기 {days.length}/{days.length}</p>
+          )}
+          <button
+            className="ld-top"
+            type="button"
+            onClick={() => scroller.current?.scrollTo({ top: 0, behavior: "smooth" })}
+          >
+            맨위로
+          </button>
+        </div>
+      ) : null}
+      {shareDay ? (
+        <div className="ld-mask" onClick={() => setShareDate(null)} role="presentation">
+          <div className="ld-sheet" onClick={(e) => e.stopPropagation()} role="dialog">
+            <b>{shareDay.date} 원장 공유</b>
+            <p>{c.name} 고객에게 보내는 일별 원장입니다.</p>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={() => {
+                nav.setToast("고객에게 일별 원장을 보냈습니다");
+                setShareDate(null);
+              }}
+            >
+              카카오톡
+            </button>
+            <button
+              className="btn outline"
+              type="button"
+              onClick={() => {
+                nav.setToast("고객에게 일별 원장을 보냈습니다");
+                setShareDate(null);
+              }}
+            >
+              문자
+            </button>
+            <button
+              className="btn ghost"
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(shareText);
+                nav.setToast("복사됨");
+                setShareDate(null);
+              }}
+            >
+              복사
+            </button>
+            <button className="btn ghost" type="button" onClick={() => setShareDate(null)}>
+              닫기
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function TradeFlow({
@@ -187,15 +663,16 @@ function TradeFlow({
   onExit?: () => void;
 }) {
   const nav = useNav();
-  const fromCrm = nav.stack[nav.stack.length - 1] === "customer";
-  const [pickedId, setPickedId] = useState<string | null>(() => (fromCrm ? nav.customerId : null));
+  const last = nav.stack[nav.stack.length - 1];
+  const keepCustomer = last === "customer" || last === "ledger";
+  const [pickedId, setPickedId] = useState<string | null>(() => (keepCustomer ? nav.customerId : null));
   const leave = onExit ?? nav.back;
 
   if (!pickedId) {
     return <CustomerPick title={title} onPick={setPickedId} onBack={leave} />;
   }
 
-  const onBack = fromCrm ? leave : () => setPickedId(null);
+  const onBack = keepCustomer ? leave : () => setPickedId(null);
   if (kind === "slips") return <SlipsPage customerId={pickedId} onBack={onBack} cancelledOnly={false} />;
   if (kind === "cancelled") return <SlipsPage customerId={pickedId} onBack={onBack} cancelledOnly />;
   if (kind === "sales") return <SalesPage customerId={pickedId} onBack={onBack} />;
@@ -858,6 +1335,7 @@ export function PromoScreen() {
 
 export function OrderScreen() {
   const nav = useNav();
+  const { addOrder } = useConsults();
   const [qty, setQty] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("전체");
@@ -984,8 +1462,9 @@ export function OrderScreen() {
                 type="button"
                 disabled={overLimit}
                 onClick={() => {
+                  addOrder(picked.map((p) => ({ productId: p.id, qty: qty[p.id] ?? 0 })));
                   setCheck(false);
-                  nav.setToast("본품 주문이 접수되었습니다");
+                  nav.setToast("미확정 주문으로 접수되었습니다");
                   nav.go("orderLookup");
                 }}
               >
@@ -1001,11 +1480,12 @@ export function OrderScreen() {
 
 export function OrderLookupScreen() {
   const nav = useNav();
+  const { orders, confirmOrder } = useConsults();
   return (
     <div className="app-scroll">
       <TopBar title="주문조회" onBack={() => nav.go("work")} />
       <div className="pad">
-        {productOrders.map((order) => {
+        {orders.map((order) => {
           const lines = order.items
             .map((it) => {
               const p = products.find((x) => x.id === it.productId);
@@ -1019,7 +1499,7 @@ export function OrderLookupScreen() {
             <div className="perf-cust" key={order.id}>
               <div className="perf-cust-h">
                 <b>{order.no}</b>
-                <span className="order-st">{order.status}</span>
+                <span className={`order-st${order.status === "미확정" ? " pending" : ""}`}>{order.status}</span>
               </div>
               <p className="order-date">{order.date}</p>
               {lines.map((r) => (
@@ -1035,6 +1515,18 @@ export function OrderLookupScreen() {
                 <span>합계 {qtySum}개</span>
                 <b>{krw(total)}</b>
               </div>
+              {order.status === "미확정" ? (
+                <button
+                  className="btn sm outline order-confirm"
+                  type="button"
+                  onClick={() => {
+                    confirmOrder(order.id);
+                    nav.setToast("영업점에서 주문을 확정했습니다");
+                  }}
+                >
+                  영업점 확정
+                </button>
+              ) : null}
             </div>
           );
         })}
