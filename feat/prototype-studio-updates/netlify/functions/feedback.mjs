@@ -44,7 +44,7 @@ export default async (req) => {
     }
     const id = clean(payload.screen, 40);
     const name = clean(payload.name, 20) || "익명";
-    const body = clean(payload.body, 400);
+    const body = clean(payload.body, 800);
     if (!id || !body) return json(400, { ok: false });
     const prev = await store.get(id, { type: "json" });
     const list = Array.isArray(prev) ? prev : [];

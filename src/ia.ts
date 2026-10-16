@@ -19,6 +19,20 @@ export interface ScreenCatalogRow {
 
 export const iaTree: IaNode[] = [
   {
+    label: "프로토타입 스튜디오",
+    type: "섹션",
+    desc: "IRIS 폰 UI 밖의 기획 검증 셸. 메뉴·QR·UI/UX 의견 공간",
+    entry: "데스크탑 스튜디오 또는 ?review=1",
+    children: [
+      {
+        label: "UI/UX 의견",
+        type: "섹션",
+        desc: "프로토타입 전체에 대한 자유 의견을 남기고 다른 방문자의 의견을 봄. 폰 화면 밖 패널 또는 ?review=1 페이지",
+        entry: "스튜디오 폰 옆 패널 / ?review=1",
+      },
+    ],
+  },
+  {
     label: "공통",
     type: "섹션",
     desc: "로그인 이후 전 화면에 공통으로 노출되는 크롬(헤더·탭바·플로팅 버튼)",
@@ -95,12 +109,6 @@ export const iaTree: IaNode[] = [
         desc: "로그인 후 우하단 FAB. 고객등록 화면에서는 숨김",
         entry: "로그인 후",
         children: [
-          {
-            label: "의견",
-            type: "FAB",
-            desc: "현재 화면에 대한 의견을 남기고 다른 방문자의 의견을 봄",
-            entry: "전 화면 FAB (고객등록 제외)",
-          },
           {
             label: "챗봇",
             type: "FAB",

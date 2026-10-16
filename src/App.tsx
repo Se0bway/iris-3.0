@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { screenNotes, sitemap } from "./data";
-import { FeedbackSheet } from "./FeedbackSheet";
+import { FeedbackBoard } from "./FeedbackBoard";
 import { downloadIaExcel } from "./exportIa";
 import { ConsultProvider } from "./consult";
 import {
@@ -56,6 +56,7 @@ import type { MessageType, ScreenId } from "./types";
 
 const SHARE_URL = typeof window !== "undefined" ? window.location.origin : "";
 const PHONE_URL = `${SHARE_URL}?phone=1`;
+const REVIEW_URL = `${SHARE_URL}?review=1`;
 const QR_SRC = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&ecc=M&data=${encodeURIComponent(PHONE_URL)}`;
 
 type TabDef = { id: ScreenId; label: string; icon: typeof IconBox; office?: boolean };
@@ -64,6 +65,7 @@ function usePhoneShell() {
   const [phoneShell, setPhoneShell] = useState(() => {
     if (typeof window === "undefined") return false;
     const q = new URLSearchParams(window.location.search);
+    if (q.get("review") === "1") return false;
     if (q.get("phone") === "1") return true;
     const ua = navigator.userAgent;
     if (/Android|iPhone|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true;
@@ -76,9 +78,10 @@ function usePhoneShell() {
       const q = new URLSearchParams(window.location.search);
       const ua = navigator.userAgent;
       setPhoneShell(
-        q.get("phone") === "1" ||
-          /Android|iPhone|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
-          mq.matches
+        q.get("review") !== "1" &&
+          (q.get("phone") === "1" ||
+            /Android|iPhone|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+            mq.matches)
       );
     };
     mq.addEventListener("change", sync);
@@ -86,6 +89,19 @@ function usePhoneShell() {
   }, []);
 
   return phoneShell;
+}
+
+function useReviewPage() {
+  const [reviewPage, setReviewPage] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("review") === "1";
+  });
+  useEffect(() => {
+    const sync = () => setReviewPage(new URLSearchParams(window.location.search).get("review") === "1");
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  return reviewPage;
 }
 
 const tabs: TabDef[] = [
@@ -248,8 +264,6 @@ export default function App() {
     draftName: "",
     draftPhone: "",
   });
-  const [fbOpen, setFbOpen] = useState(false);
-
   const api = useMemo(
     () => ({
       ...state,
@@ -291,15 +305,20 @@ export default function App() {
 
   const activeTab = activeTabOf(state.screen, state.customerId);
   const phoneShell = usePhoneShell();
+  const reviewPage = useReviewPage();
 
   useEffect(() => {
-    document.documentElement.classList.toggle("phone-shell", phoneShell);
-    document.body.classList.toggle("phone-shell", phoneShell);
+    document.documentElement.classList.toggle("phone-shell", phoneShell && !reviewPage);
+    document.body.classList.toggle("phone-shell", phoneShell && !reviewPage);
+    document.documentElement.classList.toggle("review-shell", reviewPage);
+    document.body.classList.toggle("review-shell", reviewPage);
     return () => {
       document.documentElement.classList.remove("phone-shell");
       document.body.classList.remove("phone-shell");
+      document.documentElement.classList.remove("review-shell");
+      document.body.classList.remove("review-shell");
     };
-  }, [phoneShell]);
+  }, [phoneShell, reviewPage]);
 
   const phone = (
             <div className={`phone${phoneShell ? " phone-live" : ""}`}>
@@ -326,8 +345,8 @@ export default function App() {
               </div>
               <div className="app">
                 <ScreenInner screen={state.screen} />
-                {state.screen !== "register" ? (
-                  isAuthed(state.screen) && state.fabsHidden ? (
+                {state.screen !== "register" && isAuthed(state.screen) ? (
+                  state.fabsHidden ? (
                     <button
                       className={`fab-peek ${state.screen === "chat" ? "over-chat" : ""}`}
                       type="button"
@@ -337,18 +356,11 @@ export default function App() {
                       <IconDown width={16} height={16} style={{ transform: "rotate(180deg)" }} />
                     </button>
                   ) : (
-                    <div
-                      className={`fab-stack${isAuthed(state.screen) ? "" : " guest"}${state.screen === "chat" ? " over-chat" : ""}`}
-                    >
-                      {isAuthed(state.screen) ? (
-                        <button className="fab-hide" type="button" onClick={api.toggleFabs} aria-label="플로팅 버튼 숨기기">
-                          <IconDown width={14} height={14} />
-                        </button>
-                      ) : null}
-                      <button className="fab-ai fab-fb" type="button" onClick={() => setFbOpen(true)} aria-label="의견">
-                        <span>의견</span>
+                    <div className={`fab-stack${state.screen === "chat" ? " over-chat" : ""}`}>
+                      <button className="fab-hide" type="button" onClick={api.toggleFabs} aria-label="플로팅 버튼 숨기기">
+                        <IconDown width={14} height={14} />
                       </button>
-                      {isAuthed(state.screen) && state.screen !== "chat" ? (
+                      {state.screen !== "chat" ? (
                         <button className="fab-ai" type="button" onClick={() => api.go("chat")} aria-label="챗봇">
                           <IconChat width={18} height={18} />
                           <span>챗봇</span>
@@ -357,7 +369,6 @@ export default function App() {
                     </div>
                   )
                 ) : null}
-                <FeedbackSheet screen={state.screen} open={fbOpen} onClose={() => setFbOpen(false)} />
                 {isAuthed(state.screen) ? (
                   <nav className="tabbar">
                     {tabs.map((t) => {
@@ -401,6 +412,27 @@ export default function App() {
               {state.toast ? <div className="toast">{state.toast}</div> : null}
             </div>
   );
+
+  if (reviewPage) {
+    return (
+      <ConsultProvider>
+        <NavContext.Provider value={api}>
+          <div className="review-page">
+            <header className="review-head">
+              <div>
+                <h1>IRIS 3.0 UI/UX 의견</h1>
+                <p>프로토타입 화면 구성과 흐름에 대해 자유롭게 남겨 주세요.</p>
+              </div>
+              <a className="review-back" href={SHARE_URL}>
+                프로토타입 보기
+              </a>
+            </header>
+            <FeedbackBoard variant="page" />
+          </div>
+        </NavContext.Provider>
+      </ConsultProvider>
+    );
+  }
 
   if (phoneShell) {
     return (
@@ -450,6 +482,12 @@ export default function App() {
                   {PHONE_URL}
                 </a>
               </p>
+              <p className="share-url">
+                의견만 남기기{" "}
+                <a href={REVIEW_URL} target="_blank" rel="noreferrer">
+                  {REVIEW_URL}
+                </a>
+              </p>
             </div>
             <div className="stage-head-aside">
               <button className="ia-export" type="button" onClick={downloadIaExcel}>
@@ -458,7 +496,10 @@ export default function App() {
               <div className="stage-note">{screenNotes[state.screen]}</div>
             </div>
           </div>
-          <div className="phone-wrap">{phone}</div>
+          <div className="phone-wrap">
+            {phone}
+            <FeedbackBoard />
+          </div>
         </main>
         <aside className="qr-dock">
           <img src={QR_SRC} width={176} height={176} alt="모바일 접속 QR" />

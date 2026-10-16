@@ -1,5 +1,7 @@
 export type FeedbackItem = { id: string; name: string; body: string; at: string };
 
+export const UX_BOARD = "ux";
+
 const LS = "iris-feedback";
 
 function localAll(): Record<string, FeedbackItem[]> {
