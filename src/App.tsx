@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { screenNotes, sitemap } from "./data";
-import { FeedbackSheet } from "./Feedback";
+import { FeedbackSheet } from "./FeedbackSheet";
 import { downloadIaExcel } from "./exportIa";
 import { ConsultProvider } from "./consult";
 import {
