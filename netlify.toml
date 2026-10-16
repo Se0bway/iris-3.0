@@ -9,12 +9,6 @@
   directory = "netlify/functions"
 
 [[redirects]]
-  from = "/api/feedback"
-  to = "/.netlify/functions/feedback"
-  status = 200
-  force = true
-
-[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
