@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { TODAY } from "../data";
+import { TODAY, counselor } from "../data";
 import { useConsults } from "../consult";
 import { custNo, custType, formatDot, krw, levelLabel, statusLabel } from "../lib";
 import { useNav } from "../nav";
@@ -145,6 +145,10 @@ function shortType(c: Customer) {
 function bdayLabel(c: Customer) {
   const [, m, d] = c.birth.split("-");
   return `${Number(m)}/${Number(d)}`;
+}
+
+function isoDay(d: string) {
+  return d.replace(/\./g, "-").slice(0, 10);
 }
 
 function expireLabel(iso?: string) {
@@ -579,20 +583,98 @@ export function CustomersScreen() {
 
 export function StoppedScreen() {
   const nav = useNav();
-  const { list: customers } = useConsults();
+  const { list: customers, setStopped } = useConsults();
   const [q, setQ] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
 
   const list = useMemo(() => {
+    const key = q.replace(/-/g, "");
+    const no = q.replace(/\D/g, "") || q;
     return customers.filter((c) => {
       if (!c.stopped) return false;
-      return (
-        !q ||
-        c.name.includes(q) ||
-        c.phone.replace(/-/g, "").includes(q.replace(/-/g, "")) ||
-        String(custNo(c.id)).includes(q.replace(/\D/g, "") || q)
-      );
+      return !q || c.name.includes(q) || c.phone.replace(/-/g, "").includes(key) || String(custNo(c.id)).includes(no);
     });
   }, [q, customers]);
+
+  const active = useMemo(() => {
+    const key = q.replace(/-/g, "");
+    const no = q.replace(/\D/g, "") || q;
+    return customers.filter((c) => {
+      if (c.stopped) return false;
+      return !q || c.name.includes(q) || c.phone.replace(/-/g, "").includes(key) || String(custNo(c.id)).includes(no);
+    });
+  }, [q, customers]);
+
+  const leaveAdd = () => {
+    setAdding(false);
+    setPicked([]);
+    setQ("");
+  };
+
+  const toggle = (id: string) => {
+    setPicked((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  };
+
+  const applyStop = () => {
+    if (!picked.length) return;
+    picked.forEach((id) => setStopped(id, true));
+    nav.setToast(`${picked.length}명을 중지했습니다`);
+    leaveAdd();
+  };
+
+  if (adding) {
+    return (
+      <div className="app-scroll">
+        <TopBar title="중지고객 일괄 추가" onBack={leaveAdd} />
+        <div className="search cust-search">
+          <IconSearch />
+          <input
+            placeholder="고객명, 고객번호, 연락처"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="pad cust-count">정상 고객 {active.length}명 · {picked.length}명 선택</div>
+        <div className="pad">
+          <div className="card list-card cust-list">
+            {active.length === 0 ? (
+              <p className="empty">선택할 고객이 없습니다.</p>
+            ) : (
+              active.map((c) => {
+                const on = picked.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    className={`stop-pick${on ? " on" : ""}`}
+                    type="button"
+                    onClick={() => toggle(c.id)}
+                  >
+                    <span className={`stop-check${on ? " on" : ""}`} aria-hidden>
+                      {on ? "✓" : ""}
+                    </span>
+                    <span className="who">
+                      <b>
+                        {c.name} <i className="cust-kind">{shortType(c)}</i>
+                      </b>
+                      <p>
+                        {custNo(c.id)} · {c.phone}
+                      </p>
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+        <div className="pad" style={{ paddingBottom: 24 }}>
+          <button className="btn primary" type="button" disabled={!picked.length} onClick={applyStop}>
+            {picked.length ? `${picked.length}명 중지` : "고객을 선택하세요"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-scroll">
@@ -606,6 +688,19 @@ export function StoppedScreen() {
         />
       </div>
       <div className="pad cust-count">{list.length}명</div>
+      <div className="pad" style={{ paddingTop: 0, paddingBottom: 8 }}>
+        <button
+          className="btn outline"
+          type="button"
+          onClick={() => {
+            setQ("");
+            setPicked([]);
+            setAdding(true);
+          }}
+        >
+          중지고객 일괄 추가
+        </button>
+      </div>
       <div className="pad">
         <div className="card list-card cust-list">
           <div className="cust-head">
@@ -645,8 +740,11 @@ export function CustomerScreen() {
   const { notesOf, list, setStopped } = useConsults();
   const c = list.find((x) => x.id === nav.customerId) ?? list[0];
   const notes = [...notesOf(c.id)].sort((a, b) => noteTime(b.date).localeCompare(noteTime(a.date)));
-  const [tab, setTab] = useState<"profile" | "buy" | "consult" | "point">("profile");
+  const last = nav.stack[nav.stack.length - 1];
+  const [tab, setTab] = useState<"profile" | "buy" | "consult" | "point">(last === "pointGift" ? "point" : "profile");
   const [confirmStop, setConfirmStop] = useState(false);
+  const [ptSpan, setPtSpan] = useState<MoneySpan>("cur");
+  const [ptKind, setPtKind] = useState<"all" | "earn" | "use" | "expire">("all");
   const birthMd = c.birth.slice(5).replace("-", "/");
   const lastSale = [...c.ledger]
     .filter((r) => r.type === "sale")
@@ -656,6 +754,30 @@ export function CustomerScreen() {
   const nick = c.family && !["미혼", "없음"].includes(c.family) ? c.family.split(",")[0] : null;
   const joinPath = c.timeline.find((t) => t.kind === "join")?.detail ?? "방문판매";
   const point = counselPoint(c, lastSale?.product, lastSale?.date, notes[0]);
+  const ptRows = useMemo(() => {
+    const { start, end } = moneyRange(ptSpan);
+    const hist = c.pointHistory
+      .map((p) => ({
+        id: p.id,
+        date: isoDay(p.date),
+        kind: p.type as "earn" | "use" | "expire",
+        label: p.label,
+        amount: p.amount,
+      }))
+      .filter((p) => p.date >= start && p.date <= end);
+    const exp = expireLinesOf(c)
+      .filter((l) => l.expireAt >= start && l.expireAt <= end)
+      .map((l) => ({
+        id: l.id,
+        date: l.expireAt,
+        kind: "expire" as const,
+        label: l.note || l.kind,
+        amount: -Math.abs(l.amount),
+      }));
+    return [...hist, ...exp]
+      .filter((r) => ptKind === "all" || r.kind === ptKind)
+      .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  }, [c, ptSpan, ptKind]);
 
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
@@ -715,6 +837,9 @@ export function CustomerScreen() {
           <button type="button" onClick={() => nav.go("sales", { customerId: c.id })}>
             판매/수금 등록
           </button>
+          <button type="button" onClick={() => nav.go("ledger", { customerId: c.id })}>
+            고객원장
+          </button>
           <button type="button" onClick={() => nav.go("skindiag", { customerId: c.id })}>
             AI 피부진단
           </button>
@@ -730,46 +855,6 @@ export function CustomerScreen() {
             AI 추천 메세지
           </button>
         </div>
-      </div>
-
-      <div className="cd-life">
-        {c.stopped ? (
-          <button
-            className="btn outline"
-            type="button"
-            onClick={() => {
-              setStopped(c.id, false);
-              nav.setToast("정상 고객으로 변경했습니다");
-              nav.go("stopped");
-            }}
-          >
-            정상으로 변경
-          </button>
-        ) : confirmStop ? (
-          <div className="cd-life-ask">
-            <p>이 고객을 중지할까요?</p>
-            <div className="cd-life-ask-btns">
-              <button className="btn ghost" type="button" onClick={() => setConfirmStop(false)}>
-                취소
-              </button>
-              <button
-                className="btn primary"
-                type="button"
-                onClick={() => {
-                  setStopped(c.id, true);
-                  nav.setToast("고객을 중지했습니다");
-                  nav.go("customers");
-                }}
-              >
-                확인
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button className="btn ghost" type="button" onClick={() => setConfirmStop(true)}>
-            고객 중지
-          </button>
-        )}
       </div>
 
       <div className="cd-tabs">
@@ -906,18 +991,55 @@ export function CustomerScreen() {
       {tab === "point" ? (
         <div className="cd-body">
           <div className="cd-card">
-            <div className="cd-kpi">
+            <div className="cd-pt-head">
               <div>
                 <span>보유 포인트</span>
                 <b>{c.beautyPoints.toLocaleString("ko-KR")}P</b>
               </div>
+              <button
+                className="btn sm primary"
+                type="button"
+                onClick={() => {
+                  if (!custType(c).startsWith("통합")) {
+                    nav.setToast("통합고객만 선물할 수 있습니다");
+                    return;
+                  }
+                  nav.go("pointGift", { customerId: c.id });
+                }}
+              >
+                포인트 선물하기
+              </button>
             </div>
-            {c.pointHistory.length === 0 ? (
-              <p className="empty">포인트 내역이 없습니다.</p>
+            <div className="cd-pt-tabs">
+              {MONEY_OPTS.map(([id, label]) => (
+                <button key={id} className={ptSpan === id ? "on" : ""} type="button" onClick={() => setPtSpan(id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="cd-pt-tabs">
+              {(
+                [
+                  ["all", "전체"],
+                  ["earn", "적립"],
+                  ["use", "사용"],
+                  ["expire", "소멸"],
+                ] as const
+              ).map(([id, label]) => (
+                <button key={id} className={ptKind === id ? "on" : ""} type="button" onClick={() => setPtKind(id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {ptRows.length === 0 ? (
+              <p className="empty">해당 기간 내역이 없습니다.</p>
             ) : (
-              c.pointHistory.map((p) => (
+              ptRows.map((p) => (
                 <div className="log-item" key={p.id}>
-                  <div className="d">{formatDot(p.date)}</div>
+                  <div className="d">
+                    {formatDot(p.date)}
+                    {p.kind === "expire" ? " · 소멸" : p.kind === "use" ? " · 사용" : " · 적립"}
+                  </div>
                   <b>{p.label}</b>
                   <p style={{ color: p.amount > 0 ? "var(--good)" : "var(--bad)" }}>
                     {p.amount > 0 ? "+" : ""}
@@ -929,6 +1051,46 @@ export function CustomerScreen() {
           </div>
         </div>
       ) : null}
+
+      <div className="cd-life">
+        {c.stopped ? (
+          <button
+            className="btn outline"
+            type="button"
+            onClick={() => {
+              setStopped(c.id, false);
+              nav.setToast("정상 고객으로 변경했습니다");
+              nav.go("stopped");
+            }}
+          >
+            정상으로 변경
+          </button>
+        ) : confirmStop ? (
+          <div className="cd-life-ask">
+            <p>이 고객을 중지할까요?</p>
+            <div className="cd-life-ask-btns">
+              <button className="btn ghost" type="button" onClick={() => setConfirmStop(false)}>
+                취소
+              </button>
+              <button
+                className="btn primary"
+                type="button"
+                onClick={() => {
+                  setStopped(c.id, true);
+                  nav.setToast("고객을 중지했습니다");
+                  nav.go("customers");
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn ghost" type="button" onClick={() => setConfirmStop(true)}>
+            고객 중지
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -1115,8 +1277,10 @@ const TOPICS = ["피부상담", "재구매 상담", "방문상담", "클레임",
 export function NoteScreen() {
   const nav = useNav();
   const { addNote, list: customers } = useConsults();
+  const last = nav.stack[nav.stack.length - 1];
+  const keepCustomer = last === "customer" || last === "ledger";
   const [q, setQ] = useState("");
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(() => (keepCustomer ? nav.customerId : null));
   const [topic, setTopic] = useState(TOPICS[0]);
   const [body, setBody] = useState("");
 
@@ -1132,7 +1296,8 @@ export function NoteScreen() {
     }
     addNote(picked.id, topic, body.trim());
     nav.setToast("상담일지를 저장했습니다");
-    nav.go("customer", { customerId: picked.id });
+    if (last === "ledger") nav.back();
+    else nav.go("customer", { customerId: picked.id });
   };
 
   return (
@@ -1196,6 +1361,154 @@ export function NoteScreen() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+export function PointGiftScreen() {
+  const nav = useNav();
+  const { list, giftPoints, counselorPoints } = useConsults();
+  const fromSelf = nav.customerId === "self";
+  const from = list.find((x) => x.id === nav.customerId) ?? list[0];
+  const fromId = fromSelf ? "self" : from.id;
+  const fromName = fromSelf ? `${counselor.name} (나)` : from.name;
+  const fromPts = fromSelf ? counselorPoints : from.beautyPoints;
+  const [q, setQ] = useState("");
+  const [toId, setToId] = useState<string | null>(null);
+  const [amt, setAmt] = useState("");
+  const [ask, setAsk] = useState(false);
+
+  const to = list.find((c) => c.id === toId) ?? null;
+  const amount = Number(amt.replace(/\D/g, "")) || 0;
+  const candidates = list.filter((c) => {
+    if (c.stopped || c.id === fromId) return false;
+    const key = q.replace(/-/g, "");
+    return !q || c.name.includes(q) || c.phone.replace(/-/g, "").includes(key);
+  });
+
+  const send = () => {
+    if (!to) {
+      nav.setToast("받는 고객을 선택해 주세요");
+      return;
+    }
+    if (amount < 10 || amount % 10 !== 0) {
+      nav.setToast("10P 단위로 입력해 주세요");
+      return;
+    }
+    if (amount > fromPts) {
+      nav.setToast("사용가능 포인트를 초과했습니다");
+      return;
+    }
+    if (amount > 30000) {
+      nav.setToast("월 최대 3만P까지 선물할 수 있습니다");
+      return;
+    }
+    if (!ask) {
+      setAsk(true);
+      return;
+    }
+    if (!giftPoints(fromId, to.id, amount)) {
+      nav.setToast("선물을 완료하지 못했습니다");
+      return;
+    }
+    nav.setToast("받는 고객 휴대폰으로 인증을 요청했습니다");
+    if (fromSelf) nav.go("mypage");
+    else nav.go("customer", { customerId: from.id });
+  };
+
+  return (
+    <div className="app-scroll">
+      <TopBar title="포인트 선물하기" onBack={nav.back} />
+      <div className="pad">
+        <p className="pg-from">
+          보내는 {fromSelf ? "사람" : "고객"} <b>{fromName}</b>
+          <em>사용가능 {fromPts.toLocaleString("ko-KR")}P</em>
+        </p>
+        <div className="search cust-search" style={{ margin: "0 0 12px" }}>
+          <IconSearch />
+          <input
+            placeholder="받는 고객명, 연락처"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setToId(null);
+              setAsk(false);
+            }}
+          />
+        </div>
+        {!to ? (
+          <div className="card list-card cust-list">
+            {candidates.length === 0 ? (
+              <p className="empty">선택할 고객이 없습니다.</p>
+            ) : (
+              candidates.map((c) => (
+                <button
+                  key={c.id}
+                  className="stop-pick"
+                  type="button"
+                  onClick={() => {
+                    setToId(c.id);
+                    setAsk(false);
+                  }}
+                >
+                  <span className="who">
+                    <b>
+                      {c.name} <i className="cust-kind">{shortType(c)}</i>
+                    </b>
+                    <p>{c.phone}</p>
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        ) : (
+          <button
+            className="pg-to"
+            type="button"
+            onClick={() => {
+              setToId(null);
+              setAsk(false);
+            }}
+          >
+            받는 고객 <b>{to.name}</b>
+            <span>다시 선택</span>
+          </button>
+        )}
+        <div className="field" style={{ marginTop: 14 }}>
+          <label>선물할 포인트</label>
+          <input
+            inputMode="numeric"
+            placeholder="10P 단위"
+            value={amt}
+            onChange={(e) => {
+              setAmt(e.target.value);
+              setAsk(false);
+            }}
+          />
+        </div>
+        <p className="pg-hint">
+          10P 단위로 선물할 수 있습니다. 월 최대 3명·3만P까지 가능하며, 완료 후 취소할 수 없습니다.
+        </p>
+        {ask && to ? (
+          <div className="cd-life-ask" style={{ marginBottom: 12 }}>
+            <p>
+              {to.name}님께 {amount.toLocaleString("ko-KR")}P를 보낼까요?
+            </p>
+            <div className="cd-life-ask-btns">
+              <button className="btn ghost" type="button" onClick={() => setAsk(false)}>
+                취소
+              </button>
+              <button className="btn primary" type="button" onClick={send}>
+                확인
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn primary" type="button" onClick={send}>
+            선물하기
+          </button>
+        )}
+      </div>
     </div>
   );
 }

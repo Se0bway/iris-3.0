@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { TODAY, counselor, customers, homeGroups, hqPosts } from "../data";
+import { useEffect, useState } from "react";
+import { TODAY, counselor, customers, homeGroups, hqBanners, hqPosts } from "../data";
 import {
   IconBottle,
   IconCake,
@@ -30,6 +30,67 @@ const iconById: Record<string, (typeof icons)[keyof typeof icons]> = {
   pointsExpire: IconSpark,
   reward: IconWon,
 };
+
+function HomeBoardSlider() {
+  const nav = useNav();
+  const [i, setI] = useState(0);
+  const n = 1 + hqBanners.length;
+
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % n), 5000);
+    return () => clearInterval(t);
+  }, [n]);
+
+  return (
+    <div className="hq-slide-wrap">
+      <div className="hq-slide-view">
+        <div className="hq-slide-track" style={{ transform: `translateX(-${i * 100}%)` }}>
+          <div className="hq-slide">
+            <button className="hq-board" type="button" onClick={() => nav.go("board")}>
+              <div className="hq-board-h">
+                <b>게시판</b>
+                <span>
+                  더보기
+                  <IconChevron width={14} height={14} />
+                </span>
+              </div>
+              {hqPosts.map((p) => (
+                <div className="hq-post" key={p.id}>
+                  <em className={p.tag === "필수" ? "must" : ""}>{p.tag}</em>
+                  <p>{p.title}</p>
+                  <span>{p.date}</span>
+                </div>
+              ))}
+            </button>
+          </div>
+          {hqBanners.map((b) => (
+            <div className="hq-slide" key={b.id}>
+              <button className="hq-ad" type="button" onClick={() => nav.go("board")}>
+                <img src={`${import.meta.env.BASE_URL}${b.image}`} alt="" />
+                <span className="hq-ad-copy">
+                  <em>{b.tag}</em>
+                  <strong>{b.title}</strong>
+                  <p>{b.sub}</p>
+                </span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="hq-slide-dots">
+        {Array.from({ length: n }, (_, idx) => (
+          <button
+            key={idx}
+            className={idx === i ? "on" : ""}
+            type="button"
+            aria-label={`${idx + 1}번째 카드`}
+            onClick={() => setI(idx)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function PersonRow({
   c,
@@ -83,22 +144,7 @@ export function HomeScreen() {
         <p className="who">안녕하세요 {counselor.name}님~</p>
       </div>
 
-      <button className="hq-board" type="button" onClick={() => nav.go("board")}>
-        <div className="hq-board-h">
-          <b>게시판</b>
-          <span>
-            더보기
-            <IconChevron width={14} height={14} />
-          </span>
-        </div>
-        {hqPosts.map((p) => (
-          <div className="hq-post" key={p.id}>
-            <em className={p.tag === "필수" ? "must" : ""}>{p.tag}</em>
-            <p>{p.title}</p>
-            <span>{p.date}</span>
-          </div>
-        ))}
-      </button>
+      <HomeBoardSlider />
 
       <nav className="home-links" aria-label="바로가기">
         <button

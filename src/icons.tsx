@@ -122,6 +122,11 @@ export const IconDown = (p: P) => (
     <path d="M6 9l6 6 6-6" />
   </I>
 );
+export const IconMenu = (p: P) => (
+  <I {...p}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </I>
+);
 export const IconMore = (p: P) => (
   <I {...p}>
     <rect x="4" y="4" width="6.5" height="6.5" rx="1.4" />
