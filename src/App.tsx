@@ -496,16 +496,17 @@ export default function App() {
               <div className="stage-note">{screenNotes[state.screen]}</div>
             </div>
           </div>
-          <div className="phone-wrap">
-            {phone}
-            <FeedbackBoard />
-          </div>
+          <div className="phone-wrap">{phone}</div>
         </main>
-        <aside className="qr-dock">
-          <img src={QR_SRC} width={176} height={176} alt="모바일 접속 QR" />
-          <strong>모바일로 스캔</strong>
-          <span>카메라로 찍으면 폰 화면만 열립니다</span>
-          <span className="qr-url">{PHONE_URL}</span>
+        <aside className="review-dock">
+          <FeedbackBoard />
+          <div className="qr-mini">
+            <img src={QR_SRC} width={88} height={88} alt="모바일 접속 QR" />
+            <div>
+              <strong>모바일로 스캔</strong>
+              <span>카메라로 찍으면 폰 화면만 열립니다</span>
+            </div>
+          </div>
         </aside>
       </div>
     </NavContext.Provider>

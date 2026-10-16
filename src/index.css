@@ -37,10 +37,12 @@ button { cursor: pointer; }
 button:disabled { cursor: default; opacity: 0.5; }
 
 .studio {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 228px;
+  grid-template-columns: 240px minmax(0, 1fr) minmax(300px, 380px);
   gap: 0;
+  overflow: hidden;
 }
 
 .side {
@@ -48,6 +50,7 @@ button:disabled { cursor: default; opacity: 0.5; }
   color: #d7e3f0;
   padding: 22px 16px 28px;
   overflow: auto;
+  min-height: 0;
 }
 .side-brand {
   display: flex;
@@ -93,9 +96,11 @@ button:disabled { cursor: default; opacity: 0.5; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 28px 24px 40px;
+  padding: 20px 16px 28px;
   gap: 16px;
   min-width: 0;
+  overflow: auto;
+  overflow-x: hidden;
 }
 .stage-head {
   width: min(980px, 100%);
@@ -135,53 +140,57 @@ button:disabled { cursor: default; opacity: 0.5; }
 
 .phone-wrap {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
   align-items: flex-start;
-  gap: 20px;
-  width: min(980px, 100%);
+  width: 100%;
   min-width: 0;
 }
-.qr-dock {
+.review-dock {
   background: #f4f6f8;
   border-left: 1px solid #dfe3ea;
-  padding: 28px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 12px;
   min-width: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
-.qr-dock img {
-  width: 176px;
-  height: 176px;
-  max-width: 100%;
+.review-dock .fb-board {
+  flex: 1 1 auto;
+  width: 100%;
+  max-height: none;
+  min-height: 0;
+}
+.qr-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.qr-mini img {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
   background: #fff;
-  padding: 8px;
-  border-radius: 12px;
+  padding: 4px;
+  border-radius: 10px;
   border: 1px solid var(--line);
+  box-sizing: border-box;
 }
-.qr-dock strong {
-  font-size: 13px;
-  text-align: center;
+.qr-mini strong {
+  display: block;
+  font-size: 12px;
   color: var(--ink);
 }
-.qr-dock span {
+.qr-mini span {
+  display: block;
   font-size: 11px;
   color: var(--muted);
-  text-align: center;
-  line-height: 1.45;
-  max-width: 176px;
-}
-.qr-dock .qr-url {
+  line-height: 1.4;
   overflow-wrap: anywhere;
-  word-break: break-all;
-  font-size: 10px;
-  color: var(--ink-2);
 }
 html.phone-shell,
 body.phone-shell {
@@ -3132,10 +3141,10 @@ body.review-shell {
 }
 
 @media (max-width: 1180px) {
-  .studio { grid-template-columns: 220px minmax(0, 1fr) 200px; }
+  .studio { grid-template-columns: 200px minmax(0, 1fr) minmax(260px, 320px); }
 }
 @media (max-width: 860px) {
-  .studio { grid-template-columns: minmax(0, 1fr) 180px; }
+  .studio { grid-template-columns: minmax(0, 1fr) minmax(240px, 1fr); }
   .side { display: none; }
   .stage { padding: 12px; }
   .phone { width: min(390px, 100%); height: min(844px, calc(100vh - 90px)); }
