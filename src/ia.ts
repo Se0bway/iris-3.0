@@ -96,6 +96,12 @@ export const iaTree: IaNode[] = [
         entry: "로그인 후",
         children: [
           {
+            label: "의견",
+            type: "FAB",
+            desc: "현재 화면에 대한 의견을 남기고 다른 방문자의 의견을 봄",
+            entry: "전 화면 FAB (고객등록 제외)",
+          },
+          {
             label: "챗봇",
             type: "FAB",
             screenId: "chat",

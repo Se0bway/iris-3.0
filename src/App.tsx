@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { screenNotes, sitemap } from "./data";
+import { FeedbackSheet } from "./Feedback";
 import { downloadIaExcel } from "./exportIa";
 import { ConsultProvider } from "./consult";
 import {
@@ -247,6 +248,7 @@ export default function App() {
     draftName: "",
     draftPhone: "",
   });
+  const [fbOpen, setFbOpen] = useState(false);
 
   const api = useMemo(
     () => ({
@@ -324,8 +326,8 @@ export default function App() {
               </div>
               <div className="app">
                 <ScreenInner screen={state.screen} />
-                {isAuthed(state.screen) && state.screen !== "register" ? (
-                  state.fabsHidden ? (
+                {state.screen !== "register" ? (
+                  isAuthed(state.screen) && state.fabsHidden ? (
                     <button
                       className={`fab-peek ${state.screen === "chat" ? "over-chat" : ""}`}
                       type="button"
@@ -335,11 +337,18 @@ export default function App() {
                       <IconDown width={16} height={16} style={{ transform: "rotate(180deg)" }} />
                     </button>
                   ) : (
-                    <div className={`fab-stack ${state.screen === "chat" ? "over-chat" : ""}`}>
-                      <button className="fab-hide" type="button" onClick={api.toggleFabs} aria-label="플로팅 버튼 숨기기">
-                        <IconDown width={14} height={14} />
+                    <div
+                      className={`fab-stack${isAuthed(state.screen) ? "" : " guest"}${state.screen === "chat" ? " over-chat" : ""}`}
+                    >
+                      {isAuthed(state.screen) ? (
+                        <button className="fab-hide" type="button" onClick={api.toggleFabs} aria-label="플로팅 버튼 숨기기">
+                          <IconDown width={14} height={14} />
+                        </button>
+                      ) : null}
+                      <button className="fab-ai fab-fb" type="button" onClick={() => setFbOpen(true)} aria-label="의견">
+                        <span>의견</span>
                       </button>
-                      {state.screen !== "chat" ? (
+                      {isAuthed(state.screen) && state.screen !== "chat" ? (
                         <button className="fab-ai" type="button" onClick={() => api.go("chat")} aria-label="챗봇">
                           <IconChat width={18} height={18} />
                           <span>챗봇</span>
@@ -348,6 +357,7 @@ export default function App() {
                     </div>
                   )
                 ) : null}
+                <FeedbackSheet screen={state.screen} open={fbOpen} onClose={() => setFbOpen(false)} />
                 {isAuthed(state.screen) ? (
                   <nav className="tabbar">
                     {tabs.map((t) => {
