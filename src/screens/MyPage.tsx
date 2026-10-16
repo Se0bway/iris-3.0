@@ -66,7 +66,7 @@ export function MyPageScreen() {
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
       <AppHeader />
       <div className="home-title">
-        <h3>마이오피스</h3>
+        <h3>마이페이지</h3>
       </div>
       <div className="mp-list">
         <div className="mp-profile">

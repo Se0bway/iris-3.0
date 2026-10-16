@@ -53,7 +53,7 @@ import {
 } from "./screens/Work";
 import type { MessageType, ScreenId } from "./types";
 
-const SHARE_URL = "http://10.160.23.182:5173";
+const SHARE_URL = typeof window !== "undefined" ? window.location.origin : "";
 const PHONE_URL = `${SHARE_URL}?phone=1`;
 const QR_SRC = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&ecc=M&data=${encodeURIComponent(PHONE_URL)}`;
 
@@ -90,7 +90,7 @@ function usePhoneShell() {
 const tabs: TabDef[] = [
   { id: "home", label: "홈", icon: IconHome },
   { id: "customers", label: "고객", icon: IconUsers },
-  { id: "mypage", label: "마이오피스", icon: IconUser, office: true },
+  { id: "mypage", label: "마이페이지", icon: IconUser, office: true },
   { id: "work", label: "주문/입금", icon: IconBox },
   { id: "trade", label: "판매/수금", icon: IconWon },
 ];
@@ -359,11 +359,11 @@ export default function App() {
                             className={`tab office ${activeTab === t.id ? "on" : ""}`}
                             type="button"
                             onClick={() => api.go(t.id)}
-                            aria-label="마이오피스"
+                            aria-label="마이페이지"
                           >
                             <span className="office-btn">
                               <span>마이</span>
-                              <span>오피스</span>
+                              <span>페이지</span>
                             </span>
                           </button>
                         );

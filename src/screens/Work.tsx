@@ -744,16 +744,33 @@ function FlowSteps({ title, current }: { title: string; current: 1 | 2 | 3 }) {
   );
 }
 
-function CartBar({ qty, amount, onClear }: { qty: number; amount: number; onClear: () => void }) {
+function CartBar({
+  qty,
+  amount,
+  onClear,
+  onDetail,
+}: {
+  qty: number;
+  amount: number;
+  onClear: () => void;
+  onDetail?: () => void;
+}) {
   return (
     <div className="cart-bar">
       <div>
         <p>수량합계 {qty}개</p>
         <p>금액합계 {krw(amount)}</p>
       </div>
-      <button className="btn sm" type="button" onClick={onClear}>
-        카트비우기
-      </button>
+      <div className="cart-bar-acts">
+        {onDetail ? (
+          <button className="btn sm" type="button" onClick={onDetail}>
+            자세히 보기
+          </button>
+        ) : null}
+        <button className="btn sm" type="button" onClick={onClear}>
+          카트비우기
+        </button>
+      </div>
     </div>
   );
 }
@@ -1340,11 +1357,14 @@ export function OrderScreen() {
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("전체");
   const [check, setCheck] = useState(false);
-  const picked = products.filter((p) => (qty[p.id] ?? 0) > 0);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [stockView, setStockView] = useState<"in" | "all">("in");
+  const picked = products.filter((p) => p.branchStock > 0 && (qty[p.id] ?? 0) > 0);
   const qtySum = picked.reduce((s, p) => s + (qty[p.id] ?? 0), 0);
   const amount = picked.reduce((s, p) => s + p.price * (qty[p.id] ?? 0), 0);
   const overLimit = amount > counselor.creditRemain;
   const list = products.filter((p) => {
+    if (stockView === "in" && p.branchStock <= 0) return false;
     if (brand !== "전체" && p.brand !== brand) return false;
     if (q && !`${p.brand} ${p.name} ${p.code}`.includes(q)) return false;
     return true;
@@ -1368,32 +1388,49 @@ export function OrderScreen() {
             <b>{counselor.stockTurnDays}일</b>
           </div>
         </div>
-        <div className="flow-search">
-          <input placeholder="상품명, 상품코드" value={q} onChange={(e) => setQ(e.target.value)} />
-          <button className="btn sm primary" type="button">
-            검색
+        <p className="ord-sec">장바구니</p>
+        <CartBar
+          qty={qtySum}
+          amount={amount}
+          onClear={() => setQty({})}
+          onDetail={() => {
+            if (qtySum <= 0) nav.setToast("주문상품카트에 상품이 없습니다.");
+            else setCartOpen(true);
+          }}
+        />
+        <p className="ord-sec">영업점재고 여부</p>
+        <div className="ord-stock-f">
+          <button className={stockView === "in" ? "on" : ""} type="button" onClick={() => setStockView("in")}>
+            영업점재고 있음
+          </button>
+          <button className={stockView === "all" ? "on" : ""} type="button" onClick={() => setStockView("all")}>
+            재고 0 포함
           </button>
         </div>
-        <button className="btn primary" type="button" style={{ margin: "8px 0 12px" }} onClick={() => nav.go("orderLookup")}>
-          주문조회
-        </button>
-        <CartBar qty={qtySum} amount={amount} onClear={() => setQty({})} />
-        <label className="tr-brand-field">
-          <span>브랜드</span>
-          <select value={brand} onChange={(e) => setBrand(e.target.value)}>
-            {productBrands.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="ord-find">
+          <div className="flow-search">
+            <input placeholder="상품명, 상품코드" value={q} onChange={(e) => setQ(e.target.value)} />
+            <button className="btn sm primary" type="button">
+              검색
+            </button>
+          </div>
+          <label className="tr-brand-field">
+            <span>브랜드</span>
+            <select value={brand} onChange={(e) => setBrand(e.target.value)}>
+              {productBrands.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         {list.length === 0 ? (
           <p className="tr-hint">검색 결과가 없습니다.</p>
         ) : (
           list.map((p) => {
             const n = qty[p.id] ?? 0;
-            const branch = p.stock + 4;
+            const empty = p.branchStock <= 0;
             return (
               <div className="tr-prod" key={p.id}>
                 <div>
@@ -1401,18 +1438,28 @@ export function OrderScreen() {
                     {p.code} {p.brand} {p.name}
                   </b>
                   <span>
-                    소비자가격 {krw(p.price)} · 영업점재고 {branch}개 · 카운셀러재고 {p.stock}개
+                    소비자가격 {krw(p.price)} · 영업점재고 {p.branchStock}개 · 카운셀러재고 {p.stock}개
                   </span>
                 </div>
-                <div className="qty">
-                  <button type="button" disabled={n <= 0} onClick={() => setQty({ ...qty, [p.id]: Math.max(0, n - 1) })}>
-                    −
+                {empty ? (
+                  <button
+                    className="btn sm primary"
+                    type="button"
+                    onClick={() => nav.setToast("주문 신청이 등록되었습니다")}
+                  >
+                    주문 신청
                   </button>
-                  <em>{n}</em>
-                  <button type="button" onClick={() => setQty({ ...qty, [p.id]: n + 1 })}>
-                    +
-                  </button>
-                </div>
+                ) : (
+                  <div className="qty">
+                    <button type="button" disabled={n <= 0} onClick={() => setQty({ ...qty, [p.id]: Math.max(0, n - 1) })}>
+                      −
+                    </button>
+                    <em>{n}</em>
+                    <button type="button" onClick={() => setQty({ ...qty, [p.id]: n + 1 })}>
+                      +
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })
@@ -1428,6 +1475,34 @@ export function OrderScreen() {
           주문점검
         </button>
       </div>
+      {cartOpen ? (
+        <div className="slip-mask">
+          <div className="slip-dialog" style={{ width: "min(320px, 86vw)" }}>
+            <p style={{ fontWeight: 800, marginBottom: 8 }}>장바구니</p>
+            {picked.map((p) => (
+              <div className="tr-sum" key={p.id}>
+                <span>
+                  {p.brand} {p.name} · {qty[p.id]}개
+                </span>
+                <b>{krw(p.price * (qty[p.id] ?? 0))}</b>
+              </div>
+            ))}
+            <div className="tr-sum">
+              <span>수량합계</span>
+              <b>{qtySum}개</b>
+            </div>
+            <div className="tr-sum">
+              <span>금액합계</span>
+              <b>{krw(amount)}</b>
+            </div>
+            <div className="slip-dialog-btns">
+              <button className="btn primary" type="button" onClick={() => setCartOpen(false)}>
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {check ? (
         <div className="slip-mask">
           <div className="slip-dialog" style={{ width: "min(320px, 86vw)" }}>

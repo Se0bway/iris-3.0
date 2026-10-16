@@ -860,12 +860,12 @@ export const members: Member[] = [
 ];
 
 export const products = [
-  { id: "p1", code: "11001234", brand: "설화수", name: "자음생크림 60ml", price: 220000, stock: 6, type: "본품" },
-  { id: "p2", code: "11001890", brand: "설화수", name: "진설 세트", price: 520000, stock: 2, type: "본품" },
-  { id: "p3", code: "21004521", brand: "헤라", name: "블랙쿠션", price: 68000, stock: 14, type: "본품" },
-  { id: "p4", code: "31006712", brand: "아이오페", name: "레티놀 엑스퍼트", price: 180000, stock: 8, type: "본품" },
-  { id: "p5", code: "41002308", brand: "라네즈", name: "워터뱅크 크림", price: 42000, stock: 20, type: "본품" },
-  { id: "p6", code: "51003155", brand: "바이탈뷰티", name: "슈퍼콜라겐 30일", price: 75000, stock: 11, type: "본품" },
+  { id: "p1", code: "11001234", brand: "설화수", name: "자음생크림 60ml", price: 220000, stock: 6, branchStock: 10, type: "본품" },
+  { id: "p2", code: "11001890", brand: "설화수", name: "진설 세트", price: 520000, stock: 2, branchStock: 0, type: "본품" },
+  { id: "p3", code: "21004521", brand: "헤라", name: "블랙쿠션", price: 68000, stock: 14, branchStock: 18, type: "본품" },
+  { id: "p4", code: "31006712", brand: "아이오페", name: "레티놀 엑스퍼트", price: 180000, stock: 8, branchStock: 0, type: "본품" },
+  { id: "p5", code: "41002308", brand: "라네즈", name: "워터뱅크 크림", price: 42000, stock: 20, branchStock: 24, type: "본품" },
+  { id: "p6", code: "51003155", brand: "바이탈뷰티", name: "슈퍼콜라겐 30일", price: 75000, stock: 11, branchStock: 15, type: "본품" },
 ];
 
 export const productSalesBase = [
@@ -1013,7 +1013,7 @@ export const pushNotices = [
     unread: false,
     tag: "출근",
     title: "오늘 출근이 아직 등록되지 않았습니다",
-    body: "마이오피스에서 출근을 등록할 수 있습니다.",
+    body: "마이페이지에서 출근을 등록할 수 있습니다.",
     time: "08.22 09:01",
   },
 ];
@@ -1082,7 +1082,7 @@ export const sitemap: NavItem[] = [
   },
   {
     id: "mypage",
-    label: "마이오피스",
+    label: "마이페이지",
     children: [
       { id: "profile", label: "내정보확인" },
       { id: "perf", label: "영업실적" },
@@ -1187,12 +1187,12 @@ export const screenNotes: Record<string, string> = {
   skindiag: "AI 피부진단 링크발송 — 고객에게 진단 링크를 보냅니다",
   guestskin: "비고객·방문객 현장 피부진단. 고객 등록 없이 촬영하고 결과를 공유합니다",
   note: "고객을 고른 뒤 상담일지를 작성합니다. 고객 상세 상담일지에 바로 반영됩니다",
-  pointGift: "고객 포인트 또는 카운셀러 본인(마이오피스) 포인트로 다른 고객에게 선물. 10P 단위 · 받는 고객 선택 후 확인",
+  pointGift: "고객 포인트 또는 카운셀러 본인(마이페이지) 포인트로 다른 고객에게 선물. 10P 단위 · 받는 고객 선택 후 확인",
   work: "본품 주문 · 주문조회 · 재고조회 · 가상계좌 입금내역",
   orderLookup: "발주한 본품 목록 · 미확정/확정 상태 · 수량 · 금액",
   perf: "사이드바 전용 허브 — 내 실적과 그룹원 실적 간단 리포트",
-  perfMine: "마이오피스 A타입 — 월 이동 · 총합계 · 고객별 · 상품별 · 브랜드별",
-  perfGroup: "마이오피스 그룹원 — 그룹원별 판매실적 · 월 조회",
+  perfMine: "마이페이지 A타입 — 월 이동 · 총합계 · 고객별 · 상품별 · 브랜드별",
+  perfGroup: "마이페이지 그룹원 — 그룹원별 판매실적 · 월 조회",
   trade: "고객판매 · 수금 · 미수 · 입금 요약 후 내역 · 판매이력 · 판매 · 수금",
   tradeHistory: "고객원장 · 전표조회 · 취소전표조회로 분기",
   saleHistory: "기간 조회 후 상품별·고객별 탭으로 판매이력을 봅니다",
@@ -1204,7 +1204,7 @@ export const screenNotes: Record<string, string> = {
   board: "NEXT 공지 게시판 연동",
   push: "벨 아이콘으로 진입하는 Push 알림 목록",
   promo: "판촉 조회 / 주문",
-  order: "한도·재고회전일 · 상품검색 · 카트 · 주문점검 후 발주",
+  order: "한도·재고회전일 · 영업점재고 있음/재고 0 포함 · 카트 · 주문점검 후 발주",
   sales: "상품등록 → 구매계약서(결제·공급) → 판매등록결과 · 판매 ≠ 수금",
   collection: "현금·카드·무이자혜택·결제구분으로 수금 등록. 판매 ≠ 수금",
   status: "카운셀러 마감현황 — 가장 중요한 실적 메뉴",
@@ -1212,15 +1212,15 @@ export const screenNotes: Record<string, string> = {
   plcc: "PLCC 발급 / 미발급 / 혜택",
   points: "뷰티포인트 · 소멸예정 · 선물하기",
   anniversaries: "고객 기념일 조회",
-  mypage: "마이오피스 — 내 뷰티포인트 · A타입(내 실적) · B타입(에딧샵 실적) · 그룹원 실적 · 출근 · 수금 · 재고 · 본사 교육",
+  mypage: "마이페이지 — 내 뷰티포인트 · A타입(내 실적) · B타입(에딧샵 실적) · 그룹원 실적 · 출근 · 수금 · 재고 · 본사 교육",
   education: "본사 수료 교육 — 디바이스 마스터 · 직급자 교육 등",
   members: "그룹원 상태 요약 — 총원 매출 · 미수회전일 · 인센티브 수혜예상",
-  attendance: "마이오피스 출근 현황에서 오늘 출근 체크 · 월 캘린더",
+  attendance: "마이페이지 출근 현황에서 오늘 출근 체크 · 월 캘린더",
   rank: "직급 결과 조회 · 직급 예상 조회",
   profile: "소속영업장 · 계좌 · 카운셀러/에디터 코드 · 사업자 · 추천인",
   stock: "재고합계 · 가격합계 · 품목 상세",
   deposit: "가상계좌 입금내역 · 처리구분 · 상세보기 · 등록요청",
   incentive: "본인매출 · 고객판매 · 미수회전일 · 예상 인센티브",
-  editshop: "마이오피스 B타입 — 월별 에딧샵 매출·커미션 · 상품별·브랜드별",
+  editshop: "마이페이지 B타입 — 월별 에딧샵 매출·커미션 · 상품별·브랜드별",
   live: "라이브 영상 시청 — 뷰티스퀘어 연결",
 };

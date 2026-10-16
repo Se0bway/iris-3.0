@@ -2351,7 +2351,7 @@ body.phone-shell {
   padding: 10px 0 0;
   font-size: 13px;
 }
-.tr-sum span { color: var(--ink-2); }
+.tr-sum span { min-width: 0; color: var(--ink-2); overflow-wrap: anywhere; }
 .tr-sum b { font-size: 15px; color: var(--ap); overflow-wrap: anywhere; text-align: right; }
 .tr-sum b.bad { color: var(--bad); }
 
@@ -2410,6 +2410,43 @@ body.phone-shell {
   font-size: 14px;
 }
 .flow-search .btn { flex-shrink: 0; }
+.ord-sec {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--ink-2);
+}
+.ord-find {
+  min-width: 0;
+  margin: 0 0 4px;
+}
+.ord-find .flow-search { margin: 0 0 6px; }
+.ord-find .tr-brand-field { margin: 0 0 10px; }
+.ord-stock-f {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.ord-stock-f button {
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: -.02em;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.ord-stock-f button.on {
+  background: var(--ap);
+  border-color: var(--ap);
+  color: #fff;
+}
+.tr-prod > .btn.sm { flex-shrink: 0; }
 
 .cart-bar {
   display: flex;
@@ -2420,8 +2457,17 @@ body.phone-shell {
   padding: 10px 12px;
   background: #f3f5f8;
   border-radius: 10px;
+  min-width: 0;
 }
-.cart-bar p { margin: 0; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.cart-bar > div:first-child { min-width: 0; }
+.cart-bar p { margin: 0; font-size: 12px; font-weight: 700; color: var(--ink-2); overflow-wrap: anywhere; }
+.cart-bar-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
 .cart-bar .btn { flex-shrink: 0; }
 
 .flow-kv { display: flex; flex-direction: column; }
