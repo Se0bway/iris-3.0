@@ -70,24 +70,21 @@ export function MyPageScreen() {
       </div>
       <div className="mp-list">
         <div className="mp-profile">
-          <div className="mp-profile-top">
-            <button className="mp-profile-id" type="button" onClick={() => nav.go("profile")}>
-              <div>
-                <h4>{counselor.name}</h4>
-                <p className="mp-idline">
-                  <span>{counselor.no}</span>
-                  <i />
-                  <span className="mp-rank">
-                    <IconCrown width={13} height={13} />
-                    {counselor.rank}
-                  </span>
-                </p>
-                <p>{counselor.branch}</p>
-              </div>
-            </button>
-            <button className="rank-chip" type="button" onClick={() => nav.go("rank")}>
-              직급
-            </button>
+          <div className="mp-id-chip">
+            <div className="mp-name-row">
+              <h4>{counselor.name}</h4>
+              <button className="mp-info-chip" type="button" onClick={() => nav.go("profile")}>
+                계좌정보확인
+              </button>
+            </div>
+            <p>
+              <IconCrown width={12} height={12} />
+              {counselor.rank} · {counselor.branch}
+            </p>
+            <p>
+              카운셀러 {counselor.no} · 에디터 {counselor.editorCode}
+            </p>
+            <p>추천인 {counselor.recommender}</p>
           </div>
           <button className="mp-team" type="button" onClick={() => nav.go("perfGroup")}>
             <div className="mp-team-h">
@@ -239,9 +236,6 @@ export function MyPageScreen() {
         </div>
 
         <div className="mp-foot">
-          <button className="btn primary" type="button" onClick={() => nav.go("profile")}>
-            내정보확인
-          </button>
           <button className="btn outline" type="button" onClick={() => nav.go("deposit")}>
             가상계좌 입금내역
           </button>
@@ -519,59 +513,59 @@ export function ProfileScreen() {
   const nav = useNav();
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
-      <TopBar title="내정보 확인" onBack={nav.back} />
+      <TopBar title="계좌정보 확인" onBack={nav.back} />
       <div className="pad">
         <div className="card">
           <div className="kv">
-            <div className="k">이름</div>
-            <div>{counselor.name}</div>
-            <div className="k">소속영업장</div>
-            <div>{counselor.branch}</div>
-            <div className="k">카운셀러 코드</div>
-            <div>{counselor.no}</div>
-            <div className="k">에디터 코드</div>
-            <div>{counselor.editorCode}</div>
-            <div className="k">사업자등록번호</div>
-            <div>{counselor.bizNo}</div>
-            <div className="k">추천인</div>
-            <div>{counselor.recommender}</div>
-            <div className="k">직급</div>
-            <div>{counselor.rank}</div>
             <div className="k">계좌 1</div>
             <div>{counselor.accounts[0]}</div>
             <div className="k">계좌 2</div>
             <div>{counselor.accounts[1]}</div>
           </div>
         </div>
-        <button
-          className="btn ghost"
-          style={{ marginTop: 12 }}
-          type="button"
-          onClick={() => nav.setToast("약정서를 열었습니다")}
-        >
-          약정서 보기
-        </button>
       </div>
     </div>
   );
+}
+
+type StockSort = "brand" | "qty" | "price";
+
+const STOCK_SORTS = [
+  ["brand", "브랜드"],
+  ["qty", "수량"],
+  ["price", "개당가격"],
+] as const;
+
+function stockSortDir(key: StockSort): 1 | -1 {
+  return key === "brand" ? 1 : -1;
 }
 
 export function StockScreen() {
   const nav = useNav();
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("전체");
+  const [sort, setSort] = useState<StockSort>("brand");
+  const [dir, setDir] = useState<1 | -1>(1);
   const list = useMemo(() => {
     const key = q.trim().toLowerCase().replace(/-/g, "");
-    return products.filter((p) => {
-      const byBrand = brand === "전체" || p.brand === brand;
-      const bySearch =
-        !key ||
-        p.name.toLowerCase().includes(key) ||
-        p.brand.toLowerCase().includes(key) ||
-        p.code.replace(/-/g, "").toLowerCase().includes(key);
-      return byBrand && bySearch;
-    });
-  }, [q, brand]);
+    return products
+      .filter((p) => {
+        const byBrand = brand === "전체" || p.brand === brand;
+        const bySearch =
+          !key ||
+          p.name.toLowerCase().includes(key) ||
+          p.brand.toLowerCase().includes(key) ||
+          p.code.replace(/-/g, "").toLowerCase().includes(key);
+        return byBrand && bySearch;
+      })
+      .sort((a, b) => {
+        let cmp = 0;
+        if (sort === "brand") cmp = a.brand.localeCompare(b.brand, "ko") || a.name.localeCompare(b.name, "ko");
+        else if (sort === "qty") cmp = a.stock - b.stock;
+        else cmp = a.price - b.price;
+        return cmp * dir || a.id.localeCompare(b.id);
+      });
+  }, [q, brand, sort, dir]);
 
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
@@ -595,6 +589,25 @@ export function StockScreen() {
             ))}
           </select>
         </label>
+        <div className="st-sort">
+          {STOCK_SORTS.map(([id, label]) => (
+            <button
+              key={id}
+              className={sort === id ? "on" : ""}
+              type="button"
+              onClick={() => {
+                if (sort === id) setDir((d) => (d === 1 ? -1 : 1));
+                else {
+                  setSort(id);
+                  setDir(stockSortDir(id));
+                }
+              }}
+            >
+              {label}
+              {sort === id ? <i>{dir === 1 ? "↑" : "↓"}</i> : null}
+            </button>
+          ))}
+        </div>
         <div className="kpi-grid" style={{ padding: 0, marginBottom: 12 }}>
           <div className="kpi">
             <div className="lbl">재고합계</div>

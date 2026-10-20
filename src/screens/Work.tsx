@@ -4,8 +4,19 @@ import { custNo, krw } from "../lib";
 import { useNav } from "../nav";
 import { useConsults } from "../consult";
 import { IconBack, IconChevron, IconDown, IconMenu, IconSearch } from "../icons";
+import {
+  addMonthsIso,
+  CalSheet,
+  type DateSpan,
+  moneyDates,
+  type MoneySpan,
+  MONEY_OPTS,
+  PeriodPicks,
+  RangeCard,
+  RangeDateBar,
+} from "../period";
 import { AppHeader, TopBar } from "../ui";
-import type { Customer, LedgerLine, LedgerRow, ScreenId } from "../types";
+import type { Customer, LedgerLine, LedgerRow, ProductOrderStatus, ScreenId } from "../types";
 
 const stockQty = products.reduce((s, p) => s + p.stock, 0);
 const stockAmt = products.reduce((s, p) => s + p.stock * p.price, 0);
@@ -1358,13 +1369,16 @@ export function OrderScreen() {
   const [brand, setBrand] = useState("전체");
   const [check, setCheck] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [stockView, setStockView] = useState<"in" | "all">("in");
+  const [inStockOnly, setInStockOnly] = useState(true);
+  const [applyId, setApplyId] = useState<string | null>(null);
+  const [applyQty, setApplyQty] = useState(1);
+  const applyProd = applyId ? products.find((p) => p.id === applyId) : null;
   const picked = products.filter((p) => p.branchStock > 0 && (qty[p.id] ?? 0) > 0);
   const qtySum = picked.reduce((s, p) => s + (qty[p.id] ?? 0), 0);
   const amount = picked.reduce((s, p) => s + p.price * (qty[p.id] ?? 0), 0);
   const overLimit = amount > counselor.creditRemain;
   const list = products.filter((p) => {
-    if (stockView === "in" && p.branchStock <= 0) return false;
+    if (inStockOnly && p.branchStock <= 0) return false;
     if (brand !== "전체" && p.brand !== brand) return false;
     if (q && !`${p.brand} ${p.name} ${p.code}`.includes(q)) return false;
     return true;
@@ -1383,10 +1397,6 @@ export function OrderScreen() {
             <span>잔여한도</span>
             <b>{krw(counselor.creditRemain)}</b>
           </div>
-          <div>
-            <span>재고회전일</span>
-            <b>{counselor.stockTurnDays}일</b>
-          </div>
         </div>
         <p className="ord-sec">장바구니</p>
         <CartBar
@@ -1398,15 +1408,6 @@ export function OrderScreen() {
             else setCartOpen(true);
           }}
         />
-        <p className="ord-sec">영업점재고 여부</p>
-        <div className="ord-stock-f">
-          <button className={stockView === "in" ? "on" : ""} type="button" onClick={() => setStockView("in")}>
-            영업점재고 있음
-          </button>
-          <button className={stockView === "all" ? "on" : ""} type="button" onClick={() => setStockView("all")}>
-            재고 0 포함
-          </button>
-        </div>
         <div className="ord-find">
           <div className="flow-search">
             <input placeholder="상품명, 상품코드" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -1423,6 +1424,10 @@ export function OrderScreen() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="ord-stock-ck">
+            <input type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} />
+            영업점 재고 있는것만
           </label>
         </div>
         {list.length === 0 ? (
@@ -1445,7 +1450,10 @@ export function OrderScreen() {
                   <button
                     className="btn sm primary"
                     type="button"
-                    onClick={() => nav.setToast("주문 신청이 등록되었습니다")}
+                    onClick={() => {
+                      setApplyId(p.id);
+                      setApplyQty(1);
+                    }}
                   >
                     주문 신청
                   </button>
@@ -1472,7 +1480,7 @@ export function OrderScreen() {
             else setCheck(true);
           }}
         >
-          주문점검
+          주문진행
         </button>
       </div>
       {cartOpen ? (
@@ -1503,10 +1511,51 @@ export function OrderScreen() {
           </div>
         </div>
       ) : null}
+      {applyProd ? (
+        <div className="slip-mask">
+          <div className="slip-dialog ord-apply">
+            <p className="ord-apply-title">주문 신청</p>
+            <p className="ord-apply-name">
+              {applyProd.brand} {applyProd.name}
+            </p>
+            <p className="ord-apply-hint">영업장에서 확인한 뒤 주문진행됩니다.</p>
+            <div className="ord-apply-qty qty">
+              <button type="button" disabled={applyQty <= 1} onClick={() => setApplyQty((n) => Math.max(1, n - 1))}>
+                −
+              </button>
+              <em>{applyQty}</em>
+              <button type="button" onClick={() => setApplyQty((n) => n + 1)}>
+                +
+              </button>
+            </div>
+            <div className="tr-sum">
+              <span>금액</span>
+              <b>{krw(applyProd.price * applyQty)}</b>
+            </div>
+            <div className="slip-dialog-btns">
+              <button className="btn outline" type="button" onClick={() => setApplyId(null)}>
+                취소
+              </button>
+              <button
+                className="btn primary"
+                type="button"
+                onClick={() => {
+                  addOrder([{ productId: applyProd.id, qty: applyQty }], "hq");
+                  setApplyId(null);
+                  nav.setToast("승인대기 주문으로 접수되었습니다");
+                  nav.go("orderLookup");
+                }}
+              >
+                신청
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {check ? (
         <div className="slip-mask">
           <div className="slip-dialog" style={{ width: "min(320px, 86vw)" }}>
-            <p style={{ fontWeight: 800, marginBottom: 8 }}>주문점검</p>
+            <p style={{ fontWeight: 800, marginBottom: 8 }}>주문진행</p>
             {picked.map((p) => (
               <div className="tr-sum" key={p.id}>
                 <span>
@@ -1553,59 +1602,141 @@ export function OrderScreen() {
   );
 }
 
+type OrderStFilter = "미확정" | "확정" | "주문신청" | "전체";
+
+const ORDER_STATUS_OPTS: OrderStFilter[] = ["미확정", "확정", "주문신청", "전체"];
+const APPLY_STATUSES: ProductOrderStatus[] = ["승인대기", "승인", "물류 이동", "물류도착"];
+
+function matchOrderStatus(filter: OrderStFilter, status: ProductOrderStatus) {
+  if (filter === "전체") return true;
+  if (filter === "주문신청") return APPLY_STATUSES.includes(status);
+  return status === filter;
+}
+
 export function OrderLookupScreen() {
   const nav = useNav();
-  const { orders, confirmOrder } = useConsults();
+  const { orders } = useConsults();
+  const [span, setSpan] = useState<MoneySpan>("cur");
+  const [custom, setCustom] = useState<DateSpan>(() => moneyDates("cur"));
+  const [customOn, setCustomOn] = useState(false);
+  const [calWhich, setCalWhich] = useState<"start" | "end" | null>(null);
+  const [stFilter, setStFilter] = useState<OrderStFilter>("전체");
+  const dateStart = custom.dateStart;
+  const dateEnd = custom.dateEnd;
+  const dateFloor = addMonthsIso(TODAY, -12);
+  const dateCap = TODAY;
+
+  const pickDate = (which: "start" | "end", raw: string) => {
+    if (!raw) return;
+    let v = raw;
+    if (v < dateFloor) v = dateFloor;
+    if (v > dateCap) v = dateCap;
+    let s = dateStart;
+    let e = dateEnd;
+    if (which === "start") {
+      s = v;
+      if (s > e) e = s;
+    } else {
+      e = v;
+      if (e < s) s = e;
+    }
+    setCustom({ dateStart: s, dateEnd: e });
+  };
+
+  const openCal = (which: "start" | "end") => setCalWhich(which);
+
+  const list = useMemo(
+    () =>
+      orders.filter((o) => {
+        if (o.date < dateStart || o.date > dateEnd) return false;
+        return matchOrderStatus(stFilter, o.status);
+      }),
+    [orders, dateStart, dateEnd, stFilter]
+  );
+
   return (
+    <>
     <div className="app-scroll">
       <TopBar title="주문조회" onBack={() => nav.go("work")} />
+      <RangeCard>
+        <PeriodPicks
+          value={span}
+          options={MONEY_OPTS}
+          customOn={customOn}
+          onCustom={() => openCal("start")}
+          onChange={(v) => {
+            setCustomOn(false);
+            setSpan(v);
+            setCustom(moneyDates(v));
+          }}
+        />
+        <RangeDateBar start={dateStart} end={dateEnd} onOpen={openCal} />
+      </RangeCard>
+      <div className="ol-f">
+        <span className="ol-k">상태</span>
+        <div className="ol-st">
+          {ORDER_STATUS_OPTS.map((label) => (
+            <button key={label} className={stFilter === label ? "on" : ""} type="button" onClick={() => setStFilter(label)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="pad">
-        {orders.map((order) => {
-          const lines = order.items
-            .map((it) => {
-              const p = products.find((x) => x.id === it.productId);
-              if (!p) return null;
-              return { ...p, qty: it.qty, amount: p.price * it.qty };
-            })
-            .filter((x): x is NonNullable<typeof x> => x != null);
-          const total = lines.reduce((s, r) => s + r.amount, 0);
-          const qtySum = lines.reduce((s, r) => s + r.qty, 0);
-          return (
-            <div className="perf-cust" key={order.id}>
-              <div className="perf-cust-h">
-                <b>{order.no}</b>
-                <span className={`order-st${order.status === "미확정" ? " pending" : ""}`}>{order.status}</span>
-              </div>
-              <p className="order-date">{order.date}</p>
-              {lines.map((r) => (
-                <div className="perf-sum-row" key={`${order.id}-${r.id}`}>
-                  <span>
-                    {r.brand} {r.name}
-                    <em className="order-qty"> · {r.qty}개</em>
-                  </span>
-                  <b>{krw(r.amount)}</b>
+        {list.length === 0 ? (
+          <p className="empty">해당 조건의 주문이 없습니다.</p>
+        ) : (
+          list.map((order) => {
+            const lines = order.items
+              .map((it) => {
+                const p = products.find((x) => x.id === it.productId);
+                if (!p) return null;
+                return { ...p, qty: it.qty, amount: p.price * it.qty };
+              })
+              .filter((x): x is NonNullable<typeof x> => x != null);
+            const total = lines.reduce((s, r) => s + r.amount, 0);
+            const qtySum = lines.reduce((s, r) => s + r.qty, 0);
+            const pending = order.status !== "확정";
+            return (
+              <div className={`perf-cust${pending ? " order-wait" : ""}`} key={order.id}>
+                <div className="perf-cust-h">
+                  <b>{order.no}</b>
+                  <span className={`order-st${pending ? " pending" : ""}`}>{order.status}</span>
                 </div>
-              ))}
-              <div className="perf-sum-row order-total">
-                <span>합계 {qtySum}개</span>
-                <b>{krw(total)}</b>
+                <p className="order-date">{order.date}</p>
+                {lines.map((r) => (
+                  <div className="perf-sum-row" key={`${order.id}-${r.id}`}>
+                    <span>
+                      {r.brand} {r.name}
+                      <em className="order-qty"> · {r.qty}개</em>
+                    </span>
+                    <b>{krw(r.amount)}</b>
+                  </div>
+                ))}
+                <div className="perf-sum-row order-total">
+                  <span>합계 {qtySum}개</span>
+                  <b>{krw(total)}</b>
+                </div>
               </div>
-              {order.status === "미확정" ? (
-                <button
-                  className="btn sm outline order-confirm"
-                  type="button"
-                  onClick={() => {
-                    confirmOrder(order.id);
-                    nav.setToast("영업점에서 주문을 확정했습니다");
-                  }}
-                >
-                  영업점 확정
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
+    {calWhich ? (
+      <CalSheet
+        key={calWhich}
+        value={calWhich === "start" ? dateStart : dateEnd}
+        min={dateFloor}
+        max={dateCap}
+        onClose={() => setCalWhich(null)}
+        onConfirm={(ymd) => {
+          pickDate(calWhich, ymd);
+          setCustomOn(true);
+          setCalWhich(null);
+        }}
+      />
+    ) : null}
+    </>
   );
 }

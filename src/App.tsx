@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { screenNotes, sitemap } from "./data";
+import { ChangelogBoard } from "./ChangelogBoard";
 import { FeedbackBoard } from "./FeedbackBoard";
 import { downloadIaExcel } from "./exportIa";
 import { ConsultProvider } from "./consult";
@@ -253,6 +254,7 @@ function ScreenInner({ screen }: { screen: ScreenId }) {
 }
 
 export default function App() {
+  const [dockTab, setDockTab] = useState<"ux" | "log">("ux");
   const [state, setState] = useState<NavState>({
     screen: "home",
     stack: [],
@@ -499,7 +501,27 @@ export default function App() {
           <div className="phone-wrap">{phone}</div>
         </main>
         <aside className="review-dock">
-          <FeedbackBoard />
+          <div className="dock-tabs" role="tablist" aria-label="스튜디오 패널">
+            <button
+              className={dockTab === "ux" ? "on" : ""}
+              type="button"
+              role="tab"
+              aria-selected={dockTab === "ux"}
+              onClick={() => setDockTab("ux")}
+            >
+              UI/UX 의견
+            </button>
+            <button
+              className={dockTab === "log" ? "on" : ""}
+              type="button"
+              role="tab"
+              aria-selected={dockTab === "log"}
+              onClick={() => setDockTab("log")}
+            >
+              개발 이력
+            </button>
+          </div>
+          {dockTab === "ux" ? <FeedbackBoard /> : <ChangelogBoard />}
           <div className="qr-mini">
             <img src={QR_SRC} width={88} height={88} alt="모바일 접속 QR" />
             <div>

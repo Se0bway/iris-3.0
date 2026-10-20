@@ -1,9 +1,25 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { TODAY, counselor } from "../data";
 import { useConsults } from "../consult";
 import { custNo, custType, formatDot, krw, levelLabel, statusLabel } from "../lib";
 import { useNav } from "../nav";
 import { IconBell, IconCake, IconCalendar, IconChat, IconChevron, IconHome, IconPhone, IconScan, IconSearch } from "../icons";
+import {
+  addMonths,
+  addMonthsIso,
+  CalSheet,
+  type DateSpan,
+  moneyDates,
+  type MoneySpan,
+  MONEY_OPTS,
+  monthStartEnd,
+  PeriodPicks,
+  RangeCard,
+  RangeDateBar,
+  todayM,
+  todayY,
+  ymKey,
+} from "../period";
 import type { Customer, MessageType, PointExpireLine } from "../types";
 import { AppHeader, TopBar } from "../ui";
 
@@ -12,42 +28,62 @@ export { RegisterScreen } from "./Register";
 const sorts = [
   { id: "buy", label: "구매 금액" },
   { id: "unpaid", label: "미수" },
-  { id: "new", label: "등록일" },
+  { id: "new", label: "고객 등록일" },
+  { id: "idle", label: "장기 미거래" },
   { id: "birthday", label: "생일" },
   { id: "points", label: "포인트 소멸" },
 ] as const;
 
 type FilterId = (typeof sorts)[number]["id"];
-type MoneySpan = "cur" | "prev" | "m3" | "m6";
 type MonthSpan = 0 | 1 | 2;
+type IdleSpan = "m3" | "m6" | "y1";
+type JoinSpan = "cur" | "m3" | "m6" | "y1";
 
-const MONEY_OPTS = [
+const JOIN_OPTS = [
   ["cur", "당월"],
-  ["prev", "전월"],
-  ["m3", "최근 3개월"],
-  ["m6", "최근 6개월"],
+  ["m3", "3개월"],
+  ["m6", "6개월"],
+  ["y1", "1년"],
 ] as const;
 
-const todayY = Number(TODAY.slice(0, 4));
-const todayM = Number(TODAY.slice(5, 7));
+const IDLE_OPTS = [
+  ["m3", "3개월"],
+  ["m6", "6개월"],
+  ["y1", "1년"],
+] as const;
 
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
+const MONTH_OPTS = [
+  [0, "이번달"],
+  [1, "다음달"],
+  [2, "다다음달"],
+] as const;
+
+function idleRange(span: IdleSpan) {
+  const months = span === "m3" ? -3 : span === "m6" ? -6 : -12;
+  return { dateStart: addMonthsIso(TODAY, months), dateEnd: TODAY };
 }
 
-function addMonths(y: number, m: number, delta: number) {
-  const t = y * 12 + (m - 1) + delta;
-  return { y: Math.floor(t / 12), m: (t % 12) + 1 };
+function daysBetween(from: string, to: string) {
+  const a = new Date(from);
+  const b = new Date(to);
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000));
 }
 
-function ymKey(y: number, m: number) {
-  return `${y}-${pad2(m)}`;
+function lastBuyOf(c: Customer) {
+  return c.lastPurchaseAt;
 }
 
-function addDaysIso(iso: string, delta: number) {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(y, m - 1, d + delta);
-  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+function isIdleInRange(c: Customer, start: string, end: string) {
+  const last = lastBuyOf(c);
+  if (!last) return true;
+  return last < start || last > end;
+}
+
+function idleDaysOf(c: Customer) {
+  const last = lastBuyOf(c);
+  if (!last) return null;
+  if (c.lastPurchaseDays != null) return c.lastPurchaseDays;
+  return daysBetween(last, TODAY);
 }
 
 function liveSale(r: { type: string; status: string; date: string; amount: number }) {
@@ -58,26 +94,24 @@ function salesBetween(c: Customer, start: string, end: string) {
   return c.ledger.filter((r) => liveSale(r) && r.date >= start && r.date <= end).reduce((s, r) => s + r.amount, 0);
 }
 
-function monthRange() {
-  return { start: `${ymKey(todayY, todayM)}-01`, end: `${ymKey(todayY, todayM)}-31` };
-}
-
 function moneyRange(span: MoneySpan) {
-  if (span === "cur") return monthRange();
-  if (span === "prev") {
-    const p = addMonths(todayY, todayM, -1);
-    return { start: `${ymKey(p.y, p.m)}-01`, end: `${ymKey(p.y, p.m)}-31` };
-  }
+  const r = moneyDates(span);
+  return { start: r.dateStart, end: r.dateEnd };
+}
+
+function joinDates(span: JoinSpan): DateSpan {
+  if (span === "cur") return { dateStart: `${ymKey(todayY, todayM)}-01`, dateEnd: TODAY };
+  if (span === "y1") return { dateStart: addMonthsIso(TODAY, -12), dateEnd: TODAY };
   const back = addMonths(todayY, todayM, span === "m3" ? -2 : -5);
-  return { start: `${ymKey(back.y, back.m)}-01`, end: TODAY };
+  return { dateStart: `${ymKey(back.y, back.m)}-01`, dateEnd: TODAY };
 }
 
-function moneyLabel(span: MoneySpan) {
-  return MONEY_OPTS.find((o) => o[0] === span)?.[1] ?? "";
+function monthDates(span: MonthSpan): DateSpan {
+  const t = addMonths(todayY, todayM, span);
+  return monthStartEnd(t.y, t.m);
 }
 
-function buySales(c: Customer, span: MoneySpan) {
-  const { start, end } = moneyRange(span);
+function buySales(c: Customer, start: string, end: string) {
   return salesBetween(c, start, end);
 }
 
@@ -93,18 +127,8 @@ function unpaidRows(c: Customer, start: string, end: string) {
   );
 }
 
-function unpaidInRange(c: Customer, span: MoneySpan) {
-  const { start, end } = moneyRange(span);
+function unpaidInRange(c: Customer, start: string, end: string) {
   return unpaidRows(c, start, end).reduce((s, r) => s + remainingUnpaid(c, r), 0);
-}
-
-function shiftYm(span: MonthSpan) {
-  const t = addMonths(todayY, todayM, span);
-  return ymKey(t.y, t.m);
-}
-
-function birthMonthOf(c: Customer) {
-  return Number(c.birth.slice(5, 7));
 }
 
 function expireLinesOf(c: Customer): PointExpireLine[] {
@@ -121,14 +145,25 @@ function expireLinesOf(c: Customer): PointExpireLine[] {
   ];
 }
 
-function expireLinesInMonth(c: Customer, ym: string) {
+function expireLinesInRange(c: Customer, start: string, end: string) {
   return expireLinesOf(c)
-    .filter((l) => l.expireAt.startsWith(ym))
+    .filter((l) => l.expireAt >= start && l.expireAt <= end)
     .sort((a, b) => a.expireAt.localeCompare(b.expireAt) || b.amount - a.amount);
 }
 
-function expireSumInMonth(c: Customer, ym: string) {
-  return expireLinesInMonth(c, ym).reduce((s, l) => s + l.amount, 0);
+function expireSumInRange(c: Customer, start: string, end: string) {
+  return expireLinesInRange(c, start, end).reduce((s, l) => s + l.amount, 0);
+}
+
+function birthInRange(c: Customer, start: string, end: string) {
+  const y0 = Number(start.slice(0, 4));
+  const y1 = Number(end.slice(0, 4));
+  const md = c.birth.slice(5);
+  for (let y = y0; y <= y1; y++) {
+    const occ = `${y}-${md}`;
+    if (occ >= start && occ <= end) return true;
+  }
+  return false;
 }
 
 function salesRows(c: Customer, start: string, end: string) {
@@ -159,25 +194,27 @@ function expireLabel(iso?: string) {
 function chipHead(seg: FilterId) {
   if (seg === "buy") return "구매 금액";
   if (seg === "unpaid") return "미수";
-  if (seg === "new") return "등록일";
+  if (seg === "new") return "고객 등록일";
+  if (seg === "idle") return "최종구매";
   if (seg === "birthday") return "생일";
   if (seg === "points") return "소멸예정";
   return "";
 }
 
-function chipMeta(c: Customer, seg: FilterId, moneySpan: MoneySpan, ym: string) {
-  if (seg === "buy") return krw(buySales(c, moneySpan));
+function chipMeta(c: Customer, seg: FilterId, start: string, end: string) {
+  if (seg === "buy") return krw(buySales(c, start, end));
   if (seg === "unpaid") {
-    const v = unpaidInRange(c, moneySpan);
+    const v = unpaidInRange(c, start, end);
     return v ? krw(v) : "없음";
   }
   if (seg === "new") return formatDot(c.joinedAt);
+  if (seg === "idle") return lastBuyOf(c) ? formatDot(lastBuyOf(c) as string) : "거래없음";
   if (seg === "birthday") return bdayLabel(c);
   if (seg === "points") {
-    const first = expireLinesInMonth(c, ym)[0];
+    const first = expireLinesInRange(c, start, end)[0];
     return (
       <>
-        <em>{expireSumInMonth(c, ym).toLocaleString("ko-KR")}P</em>
+        <em>{expireSumInRange(c, start, end).toLocaleString("ko-KR")}P</em>
         <em>{expireLabel(first?.expireAt)}</em>
       </>
     );
@@ -185,15 +222,23 @@ function chipMeta(c: Customer, seg: FilterId, moneySpan: MoneySpan, ym: string) 
   return null;
 }
 
-function chipSort(a: Customer, b: Customer, seg: FilterId, moneySpan: MoneySpan, ym: string) {
+function chipSort(a: Customer, b: Customer, seg: FilterId, start: string, end: string) {
   if (seg === "new") return b.joinedAt.localeCompare(a.joinedAt);
-  if (seg === "buy") return buySales(b, moneySpan) - buySales(a, moneySpan) || custNo(a.id) - custNo(b.id);
-  if (seg === "unpaid") return unpaidInRange(b, moneySpan) - unpaidInRange(a, moneySpan) || custNo(a.id) - custNo(b.id);
+  if (seg === "idle") {
+    const la = lastBuyOf(a) ?? "";
+    const lb = lastBuyOf(b) ?? "";
+    if (!la && !lb) return custNo(a.id) - custNo(b.id);
+    if (!la) return -1;
+    if (!lb) return 1;
+    return la.localeCompare(lb) || custNo(a.id) - custNo(b.id);
+  }
+  if (seg === "buy") return buySales(b, start, end) - buySales(a, start, end) || custNo(a.id) - custNo(b.id);
+  if (seg === "unpaid") return unpaidInRange(b, start, end) - unpaidInRange(a, start, end) || custNo(a.id) - custNo(b.id);
   if (seg === "birthday") return a.birth.slice(5).localeCompare(b.birth.slice(5));
   if (seg === "points") {
-    const da = expireLinesInMonth(a, ym)[0]?.expireAt ?? "";
-    const db = expireLinesInMonth(b, ym)[0]?.expireAt ?? "";
-    return da.localeCompare(db) || expireSumInMonth(b, ym) - expireSumInMonth(a, ym);
+    const da = expireLinesInRange(a, start, end)[0]?.expireAt ?? "";
+    const db = expireLinesInRange(b, start, end)[0]?.expireAt ?? "";
+    return da.localeCompare(db) || expireSumInRange(b, start, end) - expireSumInRange(a, start, end);
   }
   return custNo(a.id) - custNo(b.id);
 }
@@ -201,7 +246,8 @@ function chipSort(a: Customer, b: Customer, seg: FilterId, moneySpan: MoneySpan,
 function metricTitle(seg: FilterId) {
   if (seg === "buy") return "구매 금액";
   if (seg === "unpaid") return "미수";
-  if (seg === "new") return "등록일";
+  if (seg === "new") return "고객 등록일";
+  if (seg === "idle") return "장기 미거래";
   if (seg === "birthday") return "생일";
   if (seg === "points") return "포인트 소멸";
   return "내역";
@@ -209,66 +255,6 @@ function metricTitle(seg: FilterId) {
 
 function joinMinOf(customers: Customer[]) {
   return customers.length ? customers.reduce((m, c) => (c.joinedAt < m ? c.joinedAt : m), TODAY) : TODAY;
-}
-
-function StepperRow({
-  label,
-  value,
-  onMinus,
-  onPlus,
-  minusOff,
-  plusOff,
-}: {
-  label: string;
-  value: string;
-  onMinus: () => void;
-  onPlus: () => void;
-  minusOff?: boolean;
-  plusOff?: boolean;
-}) {
-  return (
-    <div className="range-row">
-      <span>{label}</span>
-      <div className="range-step">
-        <button type="button" onClick={onMinus} disabled={minusOff} aria-label={`${label} 줄이기`}>
-          −
-        </button>
-        <b>{value}</b>
-        <button type="button" onClick={onPlus} disabled={plusOff} aria-label={`${label} 늘리기`}>
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PeriodPicks<T extends string | number>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T;
-  options: readonly (readonly [T, string])[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="period-btns">
-      {options.map(([id, label]) => (
-        <button key={String(id)} className={`period-btn ${value === id ? "on" : ""}`} type="button" onClick={() => onChange(id)}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function RangeCard({ children }: { children: ReactNode }) {
-  return (
-    <div className="range-card">
-      <span className="range-k">조회조건</span>
-      {children}
-    </div>
-  );
 }
 
 function InfoCard({ rows }: { rows: [string, string][] }) {
@@ -287,21 +273,20 @@ function InfoCard({ rows }: { rows: [string, string][] }) {
 function ChipMetricScreen({
   customer: c,
   seg,
-  moneySpan,
-  ym,
+  dateStart,
+  dateEnd,
   onBack,
 }: {
   customer: Customer;
   seg: FilterId;
-  moneySpan: MoneySpan;
-  ym: string;
+  dateStart: string;
+  dateEnd: string;
   onBack: () => void;
 }) {
-  const range = moneyRange(moneySpan);
-  const sales = salesRows(c, range.start, range.end);
-  const unpaid = unpaidRows(c, range.start, range.end);
-  const expires = expireLinesInMonth(c, ym);
-  const period = moneyLabel(moneySpan);
+  const sales = salesRows(c, dateStart, dateEnd);
+  const unpaid = unpaidRows(c, dateStart, dateEnd);
+  const expires = expireLinesInRange(c, dateStart, dateEnd);
+  const period = `${formatDot(dateStart)}~${formatDot(dateEnd)}`;
 
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
@@ -315,7 +300,7 @@ function ChipMetricScreen({
         {seg === "points" ? (
           <>
             <p className="ex-sum">
-              {Number(ym.slice(5, 7))}월 소멸 {expireSumInMonth(c, ym).toLocaleString("ko-KR")}P
+              소멸 {expireSumInRange(c, dateStart, dateEnd).toLocaleString("ko-KR")}P
             </p>
             {expires.length === 0 ? (
               <p className="empty">해당 월 소멸 내역이 없습니다.</p>
@@ -342,7 +327,7 @@ function ChipMetricScreen({
         ) : null}
         {seg === "buy" ? (
           <>
-            <InfoCard rows={[[`${period} 구매`, krw(buySales(c, moneySpan))]]} />
+            <InfoCard rows={[[`${period} 구매`, krw(buySales(c, dateStart, dateEnd))]]} />
             {sales.length === 0 ? (
               <p className="empty">해당 기간 판매 내역이 없습니다.</p>
             ) : (
@@ -368,7 +353,7 @@ function ChipMetricScreen({
         ) : null}
         {seg === "unpaid" ? (
           <>
-            <InfoCard rows={[[`${period} 미수`, unpaidInRange(c, moneySpan) ? krw(unpaidInRange(c, moneySpan)) : "없음"]]} />
+            <InfoCard rows={[[`${period} 미수`, unpaidInRange(c, dateStart, dateEnd) ? krw(unpaidInRange(c, dateStart, dateEnd)) : "없음"]]} />
             {unpaid.length === 0 ? (
               <p className="empty">해당 기간 미수 내역이 없습니다.</p>
             ) : (
@@ -392,7 +377,15 @@ function ChipMetricScreen({
             )}
           </>
         ) : null}
-        {seg === "new" ? <InfoCard rows={[["등록일", formatDot(c.joinedAt)]]} /> : null}
+        {seg === "new" ? <InfoCard rows={[["고객 등록일", formatDot(c.joinedAt)]]} /> : null}
+        {seg === "idle" ? (
+          <InfoCard
+            rows={[
+              ["최종구매일", lastBuyOf(c) ? formatDot(lastBuyOf(c) as string) : "거래없음"],
+              ["미거래", idleDaysOf(c) == null ? "거래 이력 없음" : `${idleDaysOf(c)}일`],
+            ]}
+          />
+        ) : null}
         {seg === "birthday" ? (
           <InfoCard
             rows={[
@@ -412,36 +405,50 @@ export function CustomersScreen() {
   const [q, setQ] = useState("");
   const [seg, setSeg] = useState<FilterId>("buy");
   const [moneySpan, setMoneySpan] = useState<MoneySpan>("cur");
+  const [joinSpan, setJoinSpan] = useState<JoinSpan>("cur");
   const [monthSpan, setMonthSpan] = useState<MonthSpan>(0);
-  const [custom, setCustom] = useState<{ dateStart: string; dateEnd: string } | null>(null);
+  const [idleSpan, setIdleSpan] = useState<IdleSpan>("m3");
+  const [custom, setCustom] = useState<DateSpan>(() => moneyDates("cur"));
+  const [customOn, setCustomOn] = useState(false);
+  const [calWhich, setCalWhich] = useState<"start" | "end" | null>(null);
   const [metricId, setMetricId] = useState<string | null>(null);
 
-  const ym = shiftYm(monthSpan);
   const joinMin = joinMinOf(customers);
-  const dateStart = custom?.dateStart ?? joinMin;
-  const dateEnd = custom?.dateEnd ?? TODAY;
+  const dateStart = custom.dateStart;
+  const dateEnd = custom.dateEnd;
+  const futureCap = monthDates(2).dateEnd;
+  const dateFloor = seg === "birthday" || seg === "points" ? monthDates(0).dateStart : joinMin;
+  const dateCap = seg === "birthday" || seg === "points" ? futureCap : TODAY;
 
-  const bumpDate = (which: "start" | "end", delta: number) => {
-    const floor = joinMin;
-    const capEnd = TODAY;
+  const pickDate = (which: "start" | "end", raw: string) => {
+    if (!raw) return;
+    let v = raw;
+    if (v < dateFloor) v = dateFloor;
+    if (v > dateCap) v = dateCap;
     let s = dateStart;
     let e = dateEnd;
     if (which === "start") {
-      s = addDaysIso(s, delta);
-      if (s < floor) s = floor;
-      if (s > capEnd) s = capEnd;
+      s = v;
       if (s > e) e = s;
     } else {
-      e = addDaysIso(e, delta);
-      if (e > capEnd) e = capEnd;
-      if (e < floor) e = floor;
+      e = v;
       if (e < s) s = e;
     }
     setCustom({ dateStart: s, dateEnd: e });
   };
 
+  const applyPreset = (id: FilterId, next?: { money?: MoneySpan; join?: JoinSpan; idle?: IdleSpan; month?: MonthSpan }) => {
+    const money = next?.money ?? (id === "buy" || id === "unpaid" ? "cur" : moneySpan);
+    const join = next?.join ?? (id === "new" ? "cur" : joinSpan);
+    const idle = next?.idle ?? (id === "idle" ? "m3" : idleSpan);
+    const month = next?.month ?? (id === "birthday" || id === "points" ? 0 : monthSpan);
+    if (id === "buy" || id === "unpaid") setCustom(moneyDates(money));
+    else if (id === "new") setCustom(joinDates(join));
+    else if (id === "idle") setCustom(idleRange(idle));
+    else if (id === "birthday" || id === "points") setCustom(monthDates(month));
+  };
+
   const list = useMemo(() => {
-    const bdayM = Number(ym.slice(5, 7));
     return customers
       .filter((c) => {
         if (c.stopped) return false;
@@ -452,12 +459,13 @@ export function CustomersScreen() {
           String(custNo(c.id)).includes(q.replace(/\D/g, "") || q);
         if (!hit) return false;
         if (seg === "new") return c.joinedAt >= dateStart && c.joinedAt <= dateEnd;
-        if (seg === "birthday") return birthMonthOf(c) === bdayM;
-        if (seg === "points") return expireLinesInMonth(c, ym).length > 0;
+        if (seg === "idle") return isIdleInRange(c, dateStart, dateEnd);
+        if (seg === "birthday") return birthInRange(c, dateStart, dateEnd);
+        if (seg === "points") return expireLinesInRange(c, dateStart, dateEnd).length > 0;
         return true;
       })
-      .sort((a, b) => chipSort(a, b, seg, moneySpan, ym));
-  }, [q, seg, customers, moneySpan, dateStart, dateEnd, ym]);
+      .sort((a, b) => chipSort(a, b, seg, dateStart, dateEnd));
+  }, [q, seg, customers, dateStart, dateEnd]);
 
   const metricCustomer = metricId ? (customers.find((c) => c.id === metricId) ?? null) : null;
   if (metricCustomer) {
@@ -465,8 +473,8 @@ export function CustomersScreen() {
       <ChipMetricScreen
         customer={metricCustomer}
         seg={seg}
-        moneySpan={moneySpan}
-        ym={ym}
+        dateStart={dateStart}
+        dateEnd={dateEnd}
         onBack={() => setMetricId(null)}
       />
     );
@@ -475,11 +483,21 @@ export function CustomersScreen() {
   const resetSort = (id: FilterId) => {
     setSeg(id);
     setMoneySpan("cur");
+    setJoinSpan("cur");
     setMonthSpan(0);
-    setCustom(null);
+    setIdleSpan("m3");
+    setCustomOn(false);
+    setCalWhich(null);
+    applyPreset(id, { money: "cur", join: "cur", idle: "m3", month: 0 });
+  };
+
+  const openCal = (which: "start" | "end") => {
+    setCustomOn(true);
+    setCalWhich(which);
   };
 
   return (
+    <>
     <div className="app-scroll">
       <AppHeader />
       <div className="home-title" style={{ paddingBottom: 8 }}>
@@ -510,41 +528,58 @@ export function CustomersScreen() {
       </div>
       <RangeCard>
         {seg === "buy" || seg === "unpaid" ? (
-          <PeriodPicks value={moneySpan} options={MONEY_OPTS} onChange={setMoneySpan} />
+          <PeriodPicks
+            value={moneySpan}
+            options={MONEY_OPTS}
+            customOn={customOn}
+            onCustom={() => openCal("start")}
+            onChange={(v) => {
+              setCustomOn(false);
+              setMoneySpan(v);
+              setCustom(moneyDates(v));
+            }}
+          />
         ) : null}
         {seg === "new" ? (
-          <>
-            <StepperRow
-              label="시작"
-              value={formatDot(dateStart)}
-              onMinus={() => bumpDate("start", -1)}
-              onPlus={() => bumpDate("start", 1)}
-              minusOff={dateStart <= joinMin}
-              plusOff={dateStart >= TODAY}
-            />
-            <StepperRow
-              label="종료"
-              value={formatDot(dateEnd)}
-              onMinus={() => bumpDate("end", -1)}
-              onPlus={() => bumpDate("end", 1)}
-              minusOff={dateEnd <= joinMin}
-              plusOff={dateEnd >= TODAY}
-            />
-          </>
+          <PeriodPicks
+            value={joinSpan}
+            options={JOIN_OPTS}
+            customOn={customOn}
+            onCustom={() => openCal("start")}
+            onChange={(v) => {
+              setCustomOn(false);
+              setJoinSpan(v);
+              setCustom(joinDates(v));
+            }}
+          />
+        ) : null}
+        {seg === "idle" ? (
+          <PeriodPicks
+            value={idleSpan}
+            options={IDLE_OPTS}
+            customOn={customOn}
+            onCustom={() => openCal("start")}
+            onChange={(v) => {
+              setCustomOn(false);
+              setIdleSpan(v);
+              setCustom(idleRange(v));
+            }}
+          />
         ) : null}
         {seg === "birthday" || seg === "points" ? (
           <PeriodPicks
             value={monthSpan}
-            options={
-              [
-                [0, "이번달"],
-                [1, "다음달"],
-                [2, "다다음달"],
-              ] as const
-            }
-            onChange={setMonthSpan}
+            options={MONTH_OPTS}
+            customOn={customOn}
+            onCustom={() => openCal("start")}
+            onChange={(v) => {
+              setCustomOn(false);
+              setMonthSpan(v);
+              setCustom(monthDates(v));
+            }}
           />
         ) : null}
+        <RangeDateBar start={dateStart} end={dateEnd} onOpen={openCal} />
       </RangeCard>
       <div className="pad cust-count">{list.length}명</div>
       <div className="pad">
@@ -569,7 +604,7 @@ export function CustomersScreen() {
                 </span>
               </button>
               <button className="cust-metric" type="button" onClick={() => setMetricId(c.id)}>
-                <span className="cust-metric-txt">{chipMeta(c, seg, moneySpan, ym)}</span>
+                <span className="cust-metric-txt">{chipMeta(c, seg, dateStart, dateEnd)}</span>
                 <IconChevron width={14} height={14} />
               </button>
             </div>
@@ -578,6 +613,21 @@ export function CustomersScreen() {
         </div>
       </div>
     </div>
+    {calWhich ? (
+      <CalSheet
+        key={calWhich}
+        value={calWhich === "start" ? dateStart : dateEnd}
+        min={dateFloor}
+        max={dateCap}
+        onClose={() => setCalWhich(null)}
+        onConfirm={(ymd) => {
+          pickDate(calWhich, ymd);
+          setCustomOn(true);
+          setCalWhich(null);
+        }}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -737,24 +787,17 @@ export function StoppedScreen() {
 
 export function CustomerScreen() {
   const nav = useNav();
-  const { notesOf, list, setStopped } = useConsults();
-  const c = list.find((x) => x.id === nav.customerId) ?? list[0];
-  const notes = [...notesOf(c.id)].sort((a, b) => noteTime(b.date).localeCompare(noteTime(a.date)));
+  const { notesOf, list, setStopped, removeCustomer } = useConsults();
+  const c = list.find((x) => x.id === nav.customerId);
   const last = nav.stack[nav.stack.length - 1];
   const [tab, setTab] = useState<"profile" | "buy" | "consult" | "point">(last === "pointGift" ? "point" : "profile");
   const [confirmStop, setConfirmStop] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [ptSpan, setPtSpan] = useState<MoneySpan>("cur");
   const [ptKind, setPtKind] = useState<"all" | "earn" | "use" | "expire">("all");
-  const birthMd = c.birth.slice(5).replace("-", "/");
-  const lastSale = [...c.ledger]
-    .filter((r) => r.type === "sale")
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .at(-1);
-  const plcc = c.segments.includes("vip") || c.purchaseCount >= 10;
-  const nick = c.family && !["미혼", "없음"].includes(c.family) ? c.family.split(",")[0] : null;
-  const joinPath = c.timeline.find((t) => t.kind === "join")?.detail ?? "방문판매";
-  const point = counselPoint(c, lastSale?.product, lastSale?.date, notes[0]);
+  const notes = c ? [...notesOf(c.id)].sort((a, b) => noteTime(b.date).localeCompare(noteTime(a.date))) : [];
   const ptRows = useMemo(() => {
+    if (!c) return [];
     const { start, end } = moneyRange(ptSpan);
     const hist = c.pointHistory
       .map((p) => ({
@@ -778,6 +821,25 @@ export function CustomerScreen() {
       .filter((r) => ptKind === "all" || r.kind === ptKind)
       .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
   }, [c, ptSpan, ptKind]);
+
+  if (!c) {
+    return (
+      <div className="app-scroll" style={{ background: "var(--bg)" }}>
+        <TopBar title="목록" onBack={() => nav.go("stopped")} />
+        <p className="empty pad">고객을 찾을 수 없습니다.</p>
+      </div>
+    );
+  }
+
+  const birthMd = c.birth.slice(5).replace("-", "/");
+  const lastSale = [...c.ledger]
+    .filter((r) => r.type === "sale")
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .at(-1);
+  const plcc = c.segments.includes("vip") || c.purchaseCount >= 10;
+  const nick = c.family && !["미혼", "없음"].includes(c.family) ? c.family.split(",")[0] : null;
+  const joinPath = c.timeline.find((t) => t.kind === "join")?.detail ?? "방문판매";
+  const point = counselPoint(c, lastSale?.product, lastSale?.date, notes[0]);
 
   return (
     <div className="app-scroll" style={{ background: "var(--bg)" }}>
@@ -1053,18 +1115,48 @@ export function CustomerScreen() {
       ) : null}
 
       <div className="cd-life">
-        {c.stopped ? (
-          <button
-            className="btn outline"
-            type="button"
-            onClick={() => {
-              setStopped(c.id, false);
-              nav.setToast("정상 고객으로 변경했습니다");
-              nav.go("stopped");
-            }}
-          >
-            정상으로 변경
-          </button>
+        {c.stopped && confirmDelete ? (
+          <div className="cd-life-ask">
+            <p>
+              {c.name} 고객을 삭제할까요?
+              <em>삭제하면 목록에서 사라지고 복구할 수 없습니다.</em>
+            </p>
+            <div className="cd-life-ask-btns">
+              <button className="btn ghost" type="button" onClick={() => setConfirmDelete(false)}>
+                취소
+              </button>
+              <button
+                className="btn danger"
+                type="button"
+                onClick={() => {
+                  const name = c.name;
+                  removeCustomer(c.id);
+                  nav.setToast(`${name} 고객을 삭제했습니다`);
+                  if (last === "stopped") nav.back();
+                  else nav.go("stopped");
+                }}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        ) : c.stopped ? (
+          <>
+            <button
+              className="btn outline"
+              type="button"
+              onClick={() => {
+                setStopped(c.id, false);
+                nav.setToast("정상 고객으로 변경했습니다");
+                nav.go("stopped");
+              }}
+            >
+              정상으로 변경
+            </button>
+            <button className="btn danger-line" type="button" onClick={() => setConfirmDelete(true)}>
+              고객 삭제
+            </button>
+          </>
         ) : confirmStop ? (
           <div className="cd-life-ask">
             <p>이 고객을 중지할까요?</p>

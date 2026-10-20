@@ -202,12 +202,16 @@ export interface NavItem {
   children?: NavItem[];
 }
 
-export type ProductOrderStatus = "미확정" | "확정";
+export type ProductOrderKind = "branch" | "hq";
+export const HQ_ORDER_STEPS = ["승인대기", "승인", "물류 이동", "물류도착", "확정"] as const;
+export type HqOrderStatus = (typeof HQ_ORDER_STEPS)[number];
+export type ProductOrderStatus = "미확정" | HqOrderStatus;
 
 export interface ProductOrder {
   id: string;
   no: string;
   date: string;
+  kind?: ProductOrderKind;
   status: ProductOrderStatus;
   items: { productId: string; qty: number }[];
 }
